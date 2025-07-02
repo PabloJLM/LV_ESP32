@@ -15,9 +15,12 @@
 		<Item Name="Close_ESP.vi" Type="VI" URL="../Close_ESP.vi"/>
 		<Item Name="Compile.vi" Type="VI" URL="../Compile.vi"/>
 		<Item Name="Detector_COM.vi" Type="VI" URL="../Detector_COM.vi"/>
+		<Item Name="Digital_Write.vi" Type="VI" URL="../Digital_Write.vi"/>
 		<Item Name="Firmware.vi" Type="VI" URL="../Firmware.vi"/>
 		<Item Name="Open_ESP.vi" Type="VI" URL="../Open_ESP.vi"/>
-		<Item Name="pruebas.vi" Type="VI" URL="../pruebas.vi"/>
+		<Item Name="pruebas_digw.vi" Type="VI" URL="../pruebas_digw.vi"/>
+		<Item Name="pruebas_rgb.vi" Type="VI" URL="../pruebas_rgb.vi"/>
+		<Item Name="RGB_Control.vi" Type="VI" URL="../RGB_Control.vi"/>
 		<Item Name="Upload.vi" Type="VI" URL="../Upload.vi"/>
 		<Item Name="Dependencies" Type="Dependencies"/>
 		<Item Name="Build Specifications" Type="Build"/>
