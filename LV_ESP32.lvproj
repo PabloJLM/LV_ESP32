@@ -14,6 +14,7 @@
 		<Property Name="specify.custom.address" Type="Bool">false</Property>
 		<Item Name="Close_ESP.vi" Type="VI" URL="../Close_ESP.vi"/>
 		<Item Name="Compile.vi" Type="VI" URL="../Compile.vi"/>
+		<Item Name="Config_Wifi.vi" Type="VI" URL="../Config_Wifi.vi"/>
 		<Item Name="Detector_COM.vi" Type="VI" URL="../Detector_COM.vi"/>
 		<Item Name="Digital_Write.vi" Type="VI" URL="../Digital_Write.vi"/>
 		<Item Name="Firmware.vi" Type="VI" URL="../Firmware.vi"/>
@@ -21,6 +22,7 @@
 		<Item Name="pruebas_digw.vi" Type="VI" URL="../pruebas_digw.vi"/>
 		<Item Name="pruebas_rgb.vi" Type="VI" URL="../pruebas_rgb.vi"/>
 		<Item Name="RGB_Control.vi" Type="VI" URL="../RGB_Control.vi"/>
+		<Item Name="test_firmware.vi" Type="VI" URL="../test_firmware.vi"/>
 		<Item Name="Upload.vi" Type="VI" URL="../Upload.vi"/>
 		<Item Name="Dependencies" Type="Dependencies"/>
 		<Item Name="Build Specifications" Type="Build"/>
