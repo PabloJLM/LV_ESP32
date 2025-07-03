@@ -18,8 +18,10 @@
 		<Item Name="Detector_COM.vi" Type="VI" URL="../Detector_COM.vi"/>
 		<Item Name="Digital_Write.vi" Type="VI" URL="../Digital_Write.vi"/>
 		<Item Name="Firmware.vi" Type="VI" URL="../Firmware.vi"/>
+		<Item Name="MQTT_PUBLISH.vi" Type="VI" URL="../MQTT_PUBLISH.vi"/>
 		<Item Name="Open_ESP.vi" Type="VI" URL="../Open_ESP.vi"/>
 		<Item Name="pruebas_digw.vi" Type="VI" URL="../pruebas_digw.vi"/>
+		<Item Name="pruebas_mqtt.vi" Type="VI" URL="../pruebas_mqtt.vi"/>
 		<Item Name="pruebas_rgb.vi" Type="VI" URL="../pruebas_rgb.vi"/>
 		<Item Name="RGB_Control.vi" Type="VI" URL="../RGB_Control.vi"/>
 		<Item Name="test_firmware.vi" Type="VI" URL="../test_firmware.vi"/>

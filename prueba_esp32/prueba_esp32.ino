@@ -9,11 +9,11 @@ bool pinConfigured[MAX_PINS] = {false};
 #define NUM_PIXELS 3
 Adafruit_NeoPixel pixels(NUM_PIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
-// Escribir con labview, si el usuario quiere
-const char* ssid = "%%SSID%%";
-const char* password = "%%PASS%%";
+// Cambia aquí tus credenciales WiFi
+const char* ssid = "CLARO1_8383C6";
+const char* password = "021S4WVSGC";
 
-//Config MQTT
+// Config MQTT
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -23,14 +23,15 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  // ver si quiere el usuario
+  // Verifica si el usuario quiere conexión WiFi (no empieza con "%%" y no está vacío)
   if (!String(ssid).startsWith("%%") && String(ssid).length() > 0) {
     Serial.print("Conectando a WiFi: ");
     Serial.println(ssid);
+
     WiFi.begin(ssid, password);
 
     int intentos = 0;
-    while (WiFi.status() != WL_CONNECTED && intentos < 20) { //20 intentos bajar si tarda mucho
+    while (WiFi.status() != WL_CONNECTED && intentos < 20) {
       delay(500);
       Serial.print(".");
       intentos++;
@@ -58,6 +59,10 @@ void loop() {
     String input = Serial.readStringUntil('\n');
     input.trim();
 
+    Serial.print("Input recibido: '");
+    Serial.print(input);
+    Serial.println("'");
+
     if (input.length() < 2) {
       Serial.println("ERROR: Comando muy corto.");
       return;
@@ -65,6 +70,19 @@ void loop() {
 
     char tipo = input.charAt(0);
     String data = input.substring(1);
+    data.trim();
+
+    // Si el primer caracter de data es '|', eliminarlo para no arruinar el parseo
+    if (data.length() > 0 && data.charAt(0) == '|') {
+      data = data.substring(1);
+      data.trim();
+    }
+
+    Serial.print("Tipo: ");
+    Serial.println(tipo);
+    Serial.print("Data: '");
+    Serial.print(data);
+    Serial.println("'");
 
     // ----------- Tipo 1: Digital Write (1ppv) -----------
     if (tipo == '1') {
@@ -93,7 +111,7 @@ void loop() {
     // ----------- Tipo 2: NeoPixel (2<decimalColor>) -----------
     else if (tipo == '2') {
       unsigned long color = strtoul(data.c_str(), NULL, 10);
-      
+
       uint8_t blue  = (color >> 0) & 0xFF;
       uint8_t green = (color >> 8) & 0xFF;
       uint8_t red   = (color >> 16) & 0xFF;
@@ -124,6 +142,17 @@ void loop() {
       String brokerIP = data.substring(0, pos1);
       String topic    = data.substring(pos1 + 1, pos2);
       String message  = data.substring(pos2 + 1);
+
+      brokerIP.trim();
+      topic.trim();
+      message.trim();
+
+      Serial.print("IP recibida: ");
+      Serial.println(brokerIP);
+      Serial.print("Topic recibido: ");
+      Serial.println(topic);
+      Serial.print("Mensaje recibido: ");
+      Serial.println(message);
 
       IPAddress mqttServer;
       if (!mqttServer.fromString(brokerIP)) {
