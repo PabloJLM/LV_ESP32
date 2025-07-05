@@ -9,11 +9,9 @@ bool pinConfigured[MAX_PINS] = {false};
 #define NUM_PIXELS 3
 Adafruit_NeoPixel pixels(NUM_PIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
-// Cambia aquí tus credenciales WiFi
 const char* ssid = "CLARO1_8383C6";
 const char* password = "021S4WVSGC";
 
-// Config MQTT
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -23,7 +21,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  // Verifica si el usuario quiere conexión WiFi (no empieza con "%%" y no está vacío)
+  // Ver si quiere la esp en modo online u offline
   if (!String(ssid).startsWith("%%") && String(ssid).length() > 0) {
     Serial.print("Conectando a WiFi: ");
     Serial.println(ssid);
@@ -72,7 +70,6 @@ void loop() {
     String data = input.substring(1);
     data.trim();
 
-    // Si el primer caracter de data es '|', eliminarlo para no arruinar el parseo
     if (data.length() > 0 && data.charAt(0) == '|') {
       data = data.substring(1);
       data.trim();
@@ -107,7 +104,6 @@ void loop() {
       digitalWrite(pin, val == 1 ? HIGH : LOW);
       Serial.printf("Pin %d <- %s\n", pin, val == 1 ? "HIGH" : "LOW");
     }
-
     // ----------- Tipo 2: NeoPixel (2<decimalColor>) -----------
     else if (tipo == '2') {
       unsigned long color = strtoul(data.c_str(), NULL, 10);
@@ -123,7 +119,6 @@ void loop() {
 
       Serial.printf("NeoPixel: R=%d G=%d B=%d\n", red, green, blue);
     }
-
     // ----------- Tipo 3: MQTT publish (3|ip|topic|mensaje) -----------
     else if (tipo == '3') {
       if (!wifiDisponible) {
@@ -175,6 +170,28 @@ void loop() {
       } else {
         Serial.println("ERROR: En MQTT.");
       }
+    }
+    // ----------- Tipo 6: Digital Read (6pp) -----------
+    else if (tipo == '6') {
+      if (data.length() != 2) {
+        Serial.println("ERROR: Formato de lectura digital inv�lido.");
+        return;
+      }
+
+      int pin = data.toInt();
+
+      if (pin < 4 || pin >= MAX_PINS) {
+        Serial.println("ERROR: Pin inv�lido o reservado.");
+        return;
+      }
+
+      if (!pinConfigured[pin]) {
+        pinMode(pin, INPUT);  // O INPUT_PULLUP si prefieres
+        pinConfigured[pin] = true;
+      }
+
+      int val = digitalRead(pin);
+      Serial.printf("READ %d -> %d\n", pin, val);
     }
 
     else {
