@@ -10,12 +10,12 @@ Adafruit_NeoPixel pixels(NUM_PIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-const char* ssid = "CLARO1_8383C6";
-const char* password = "021S4WVSGC";
+const char* ssid = "%%SSID%%";
+const char* password = "%%PASS%%";
 
 void setup() {
   Serial.begin(115200);
-  //Serial.print("Conectando a WiFi");
+  
 
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
@@ -34,7 +34,6 @@ void setup() {
 void loop() {
   static String line = "";
 
-  // Revisa si el primer carácter es 'A' (MQTT string command)
   if (Serial.available()) {
     char peekChar = Serial.peek();
     if (peekChar == 'A') {
@@ -45,7 +44,6 @@ void loop() {
         line += c;
       }
 
-      // Parsear línea tipo: A192.168.1.10 topic mensaje
       if (line.startsWith("A")) {
         line.remove(0, 1);  // quitar 'A'
         line.trim();
@@ -76,7 +74,7 @@ void loop() {
           bool ok = client.publish(topic.c_str(), message.c_str());
           Serial.write(ok ? 'A' : 'X');
         } else {
-          Serial.write('X');  // error de formato
+          Serial.write('X');  
         }
       }
 
