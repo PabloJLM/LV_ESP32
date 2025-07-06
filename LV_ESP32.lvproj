@@ -18,18 +18,16 @@
 		<Item Name="Compile.vi" Type="VI" URL="../Compile.vi"/>
 		<Item Name="Config_Wifi.vi" Type="VI" URL="../Config_Wifi.vi"/>
 		<Item Name="Detector_COM.vi" Type="VI" URL="../Detector_COM.vi"/>
-		<Item Name="Digital_Read.vi" Type="VI" URL="/&lt;vilib&gt;/Prueba/LV_ESP32/Digital_Read.vi"/>
-		<Item Name="Digital_Write.vi" Type="VI" URL="../Digital_Write.vi"/>
 		<Item Name="Firmware.vi" Type="VI" URL="../Firmware.vi"/>
-		<Item Name="MQTT_PUBLISH.vi" Type="VI" URL="../MQTT_PUBLISH.vi"/>
 		<Item Name="Open_ESP.vi" Type="VI" URL="../Open_ESP.vi"/>
-		<Item Name="pruebas_digr.vi" Type="VI" URL="../../../../../../../Program Files/National Instruments/LabVIEW 2025/examples/Prueba/LV_ESP32/pruebas_digr.vi"/>
-		<Item Name="pruebas_digw.vi" Type="VI" URL="../pruebas_digw.vi"/>
-		<Item Name="pruebas_mqtt.vi" Type="VI" URL="../pruebas_mqtt.vi"/>
-		<Item Name="pruebas_rgb.vi" Type="VI" URL="../pruebas_rgb.vi"/>
-		<Item Name="RGB_Control.vi" Type="VI" URL="../RGB_Control.vi"/>
 		<Item Name="test_firmware.vi" Type="VI" URL="../test_firmware.vi"/>
 		<Item Name="Upload.vi" Type="VI" URL="../Upload.vi"/>
+		<Item Name="PRUEBAS.vi" Type="VI" URL="../PRUEBAS.vi"/>
+		<Item Name="Digital_Write.vi" Type="VI" URL="../Digital_Write.vi"/>
+		<Item Name="Digital_Read.vi" Type="VI" URL="../Digital_Read.vi"/>
+		<Item Name="NP_Control.vi" Type="VI" URL="../NP_Control.vi"/>
+		<Item Name="Tets.vi" Type="VI" URL="../Tets.vi"/>
+		<Item Name="NPI_Control.vi" Type="VI" URL="../NPI_Control.vi"/>
 		<Item Name="Dependencies" Type="Dependencies"/>
 		<Item Name="Build Specifications" Type="Build">
 			<Item Name="LV_ESP32" Type="Packed Library">
@@ -42,7 +40,7 @@
 				<Property Name="Bld_localDestDirType" Type="Str">relativeToCommon</Property>
 				<Property Name="Bld_modifyLibraryFile" Type="Bool">true</Property>
 				<Property Name="Bld_previewCacheID" Type="Str">{20CFA195-5C06-4362-BD40-A83B2756939C}</Property>
-				<Property Name="Bld_version.build" Type="Int">8</Property>
+				<Property Name="Bld_version.build" Type="Int">10</Property>
 				<Property Name="Bld_version.major" Type="Int">1</Property>
 				<Property Name="Destination[0].destName" Type="Str">LV_ESP32.lvlibp</Property>
 				<Property Name="Destination[0].path" Type="Path">../builds/NI_AB_PROJECTNAME/LV_ESP32/LV_ESP32.lvlibp</Property>
