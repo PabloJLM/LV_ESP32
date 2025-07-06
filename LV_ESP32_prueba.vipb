@@ -1,7 +1,7 @@
-<VI_Package_Builder_Settings Version="2020.1" Created_Date="2025-07-03 09:33:02" Modified_Date="2025-07-05 20:16:36" Creator="pablo" Comments="" ID="a9198456dbc440d515c0913568909b71">
+<VI_Package_Builder_Settings Version="2020.1" Created_Date="2025-07-03 09:33:02" Modified_Date="2025-07-05 20:30:00" Creator="pablo" Comments="" ID="a805b3847820ec178be7aad8ae0bc60a">
   <Library_General_Settings>
     <Package_File_Name>Prueba_lib_LV_ESP32_prueba</Package_File_Name>
-    <Library_Version>1.0.1.11</Library_Version>
+    <Library_Version>1.0.1.12</Library_Version>
     <Auto_Increment_Version>false</Auto_Increment_Version>
     <Library_Source_Folder>.</Library_Source_Folder>
     <Library_Output_Folder>..</Library_Output_Folder>
@@ -286,7 +286,7 @@
         <Path>Digital_Write.vi</Path>
         <VI_Title/>
       </Items_Data>
-      <GUID>1D012B36E57946449784F8C25A42EA0D</GUID>
+      <GUID>81BA29CEAC42A53F5C25A187205B9550</GUID>
     </Functions_Palette_Data>
   </Library_Palette_Definition>
 </VI_Package_Builder_Settings>
