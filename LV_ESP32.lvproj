@@ -21,22 +21,33 @@
 			<Item Name="test_firmware.vi" Type="VI" URL="../test_firmware.vi"/>
 			<Item Name="Upload.vi" Type="VI" URL="../Upload.vi"/>
 		</Item>
+		<Item Name="Ejemplos" Type="Folder">
+			<Item Name="PRUEBAS.vi" Type="VI" URL="../PRUEBAS.vi"/>
+			<Item Name="Tets.vi" Type="VI" URL="../Tets.vi"/>
+			<Item Name="Prueba_Gen.vi" Type="VI" URL="../Prueba_Gen.vi"/>
+			<Item Name="PRUEBA_ANALOG.vi" Type="VI" URL="../PRUEBA_ANALOG.vi"/>
+			<Item Name="Prueba_mqtt.vi" Type="VI" URL="../Prueba_mqtt.vi"/>
+			<Item Name="prueba_dac.vi" Type="VI" URL="../prueba_dac.vi"/>
+			<Item Name="PRUEBA_NEO_I.vi" Type="VI" URL="../PRUEBA_NEO_I.vi"/>
+			<Item Name="PRUEBA_NEO.vi" Type="VI" URL="../PRUEBA_NEO.vi"/>
+			<Item Name="PRUEBA_DIG.vi" Type="VI" URL="../PRUEBA_DIG.vi"/>
+		</Item>
 		<Item Name="LV_ESP32.lvlib" Type="Library" URL="../LV_ESP32.lvlib"/>
 		<Item Name="Close_ESP.vi" Type="VI" URL="../Close_ESP.vi"/>
 		<Item Name="Open_ESP.vi" Type="VI" URL="../Open_ESP.vi"/>
-		<Item Name="PRUEBAS.vi" Type="VI" URL="../PRUEBAS.vi"/>
 		<Item Name="Digital_Write.vi" Type="VI" URL="../Digital_Write.vi"/>
 		<Item Name="Digital_Read.vi" Type="VI" URL="../Digital_Read.vi"/>
 		<Item Name="NP_Control.vi" Type="VI" URL="../NP_Control.vi"/>
-		<Item Name="Tets.vi" Type="VI" URL="../Tets.vi"/>
 		<Item Name="NPI_Control.vi" Type="VI" URL="../NPI_Control.vi"/>
 		<Item Name="MQTT_PUBLISH.vi" Type="VI" URL="../MQTT_PUBLISH.vi"/>
 		<Item Name="MQTT_SUBS.vi" Type="VI" URL="../MQTT_SUBS.vi"/>
 		<Item Name="report_gen.vi" Type="VI" URL="../report_gen.vi"/>
 		<Item Name="report_view.vi" Type="VI" URL="../report_view.vi"/>
-		<Item Name="Prueba_Gen.vi" Type="VI" URL="../Prueba_Gen.vi"/>
 		<Item Name="analog_read.vi" Type="VI" URL="../analog_read.vi"/>
-		<Item Name="PRUEBA_ANALOG.vi" Type="VI" URL="../PRUEBA_ANALOG.vi"/>
+		<Item Name="MQTT_CLOSE.vi" Type="VI" URL="../MQTT_CLOSE.vi"/>
+		<Item Name="DAC.vi" Type="VI" URL="../DAC.vi"/>
+		<Item Name="Generador_DAC.vi" Type="VI" URL="../Generador_DAC.vi"/>
+		<Item Name="PRUEBA_A_IO.vi" Type="VI" URL="../PRUEBA_A_IO.vi"/>
 		<Item Name="Dependencies" Type="Dependencies"/>
 		<Item Name="Build Specifications" Type="Build">
 			<Item Name="LV_ESP32" Type="Packed Library">

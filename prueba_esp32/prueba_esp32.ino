@@ -28,14 +28,23 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void setup() {
   Serial.begin(115200);
+
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 5000) {
     delay(500);
   }
-  client.setCallback(callback);
+
+  if (WiFi.status() == WL_CONNECTED) {
+    client.setCallback(callback);
+  } else {
+    
+  }
+
   pixels.begin();
   pixels.show();
 }
+
 
 void loop() {
   static String line = "";
@@ -59,7 +68,6 @@ void loop() {
 
         IPAddress brokerIP;
         if (!brokerIP.fromString(ipStr)) {
-          Serial.write('X');
           line = "";
           return;
         }
@@ -67,29 +75,24 @@ void loop() {
         client.setServer(brokerIP, 1883);
         if (!client.connected()) {
           if (!client.connect("esp32_client")) {
-            Serial.write('X');
             line = "";
             return;
           }
         }
 
-        if (tipo == 'A') { //A<ip> <topic> <msg>
+        if (tipo == 'A') { // A<ip> <topic> <msg>
           int sep2 = second.indexOf(' ');
           if (sep2 > 0) {
             String topic = second.substring(0, sep2);
             String msg = second.substring(sep2 + 1);
             bool ok = client.publish(topic.c_str(), msg.c_str());
             Serial.write(ok ? 'A' : 'X');
-          } else {
-            Serial.write('X');
           }
-        } else if (tipo == 'B') {//B<ip> <topic>
+        } else if (tipo == 'B') { // B<ip> <topic>
           listen_topic = second;
           mqtt_subscribed = client.subscribe(listen_topic.c_str());
-          Serial.write(mqtt_subscribed ? 'A' : 'X');
+          
         }
-      } else {
-        Serial.write('X');
       }
 
       line = "";
@@ -153,7 +156,8 @@ void loop() {
         }
         break;
       }
-            case 0x05: {
+
+      case 0x05: {
         while (Serial.available() < 1);
         byte pin = Serial.read();
         int val = analogRead(pin);  // lectura ADC (0–4095)
@@ -161,6 +165,20 @@ void loop() {
         Serial.write(lowByte(val));   // Enviamos LSB
         break;
       }
+
+      case 0x06: {
+        while (Serial.available() < 2);
+        byte pin = Serial.read();
+        byte val = Serial.read();
+        if (pin == 25 || pin == 26) {
+          dacWrite(pin, val);
+          Serial.write('A');
+        } else {
+          Serial.write('X');
+        }
+        break;
+      }
+
 
       case 0xF0: {
         Serial.write('A');
@@ -171,19 +189,18 @@ void loop() {
         Serial.write(WiFi.status() == WL_CONNECTED ? 'A' : 'X');
         break;
       }
-      case 0xF2: {  
+
+      case 0xF2: {
         if (mqtt_subscribed && client.connected()) {
           client.unsubscribe(listen_topic.c_str());
           mqtt_subscribed = false;
           listen_topic = "";
-          Serial.write('A');
-        } else {
-          Serial.write('X');
         }
         break;
-}
+      }
+
       default:
-        Serial.write('X');
+        //Serial.write('X');
         break;
     }
   }
