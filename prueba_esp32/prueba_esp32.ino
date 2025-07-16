@@ -1,6 +1,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <Arduino.h>
 
 #define NUM_PIXELS 3
 #define PIN_NEOPIXEL 25
@@ -10,8 +11,8 @@ Adafruit_NeoPixel pixels(NUM_PIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-const char* ssid = "CLARO1_8383C6";
-const char* password = "021S4WVSGC";
+const char* ssid = "";
+const char* password = "";
 
 String listen_topic = "";
 bool mqtt_subscribed = false;
@@ -37,14 +38,11 @@ void setup() {
 
   if (WiFi.status() == WL_CONNECTED) {
     client.setCallback(callback);
-  } else {
-    
-  }
+  } 
 
   pixels.begin();
   pixels.show();
 }
-
 
 void loop() {
   static String line = "";
@@ -91,7 +89,6 @@ void loop() {
         } else if (tipo == 'B') { // B<ip> <topic>
           listen_topic = second;
           mqtt_subscribed = client.subscribe(listen_topic.c_str());
-          
         }
       }
 
@@ -179,6 +176,16 @@ void loop() {
         break;
       }
 
+      case 0x07: {
+        while (Serial.available() < 2);
+        byte pin = Serial.read();
+        byte duty = Serial.read(); // 0–255
+
+        ledcAttachChannel(pin, 1000, 8,0);
+        ledcWrite(pin, duty);
+        Serial.write('A');
+        break;
+      }
 
       case 0xF0: {
         Serial.write('A');
