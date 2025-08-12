@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 #define NUM_PIXELS 3
-#define PIN_NEOPIXEL 25
+#define PIN_NEOPIXEL 25//se asume el pin de neopixel por la board Galiot
 
 Adafruit_NeoPixel pixels(NUM_PIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
@@ -32,7 +32,7 @@ void setup() {
 
   WiFi.begin(ssid, password);
   unsigned long start = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - start < 5000) {
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 5000) {// intebta conectar sino funciona deja el modo offline
     delay(500);
   }
 
@@ -193,7 +193,7 @@ void loop() {
       }
 
       case 0xF1: {
-        Serial.write(WiFi.status() == WL_CONNECTED ? 'A' : 'X');
+        Serial.write(WiFi.status() == WL_CONNECTED ? 'A' : 'X');//conectado o no
         break;
       }
 

@@ -23,7 +23,6 @@
 		</Item>
 		<Item Name="Ejemplos" Type="Folder">
 			<Item Name="PRUEBAS.vi" Type="VI" URL="../PRUEBAS.vi"/>
-			<Item Name="Tets.vi" Type="VI" URL="../Tets.vi"/>
 			<Item Name="Prueba_report.vi" Type="VI" URL="../Prueba_report.vi"/>
 			<Item Name="PRUEBA_ANALOG.vi" Type="VI" URL="../PRUEBA_ANALOG.vi"/>
 			<Item Name="Prueba_mqtt.vi" Type="VI" URL="../Prueba_mqtt.vi"/>
@@ -33,6 +32,9 @@
 			<Item Name="PRUEBA_DIG.vi" Type="VI" URL="../PRUEBA_DIG.vi"/>
 			<Item Name="PRUEBA_A_IO.vi" Type="VI" URL="../PRUEBA_A_IO.vi"/>
 			<Item Name="Generador de funciones.vi" Type="VI" URL="../Generador de funciones.vi"/>
+			<Item Name="Prueba_acelerometro.vi" Type="VI" URL="../Prueba_acelerometro.vi"/>
+			<Item Name="Prueba_PWM.vi" Type="VI" URL="../Prueba_PWM.vi"/>
+			<Item Name="PRUEBA_A_PWM.vi" Type="VI" URL="../PRUEBA_A_PWM.vi"/>
 		</Item>
 		<Item Name="Funciones_basicas" Type="Folder">
 			<Item Name="Close_ESP.vi" Type="VI" URL="../Close_ESP.vi"/>
@@ -55,12 +57,9 @@
 		</Item>
 		<Item Name="Funciones_AUX" Type="Folder">
 			<Item Name="Signal_Gen.vi" Type="VI" URL="../Signal_Gen.vi"/>
-			<Item Name="3D_boc.vi" Type="VI" URL="../3D_boc.vi"/>
+			<Item Name="3D_box.vi" Type="VI" URL="../3D_box.vi"/>
 		</Item>
 		<Item Name="LV_ESP32.lvlib" Type="Library" URL="../LV_ESP32.lvlib"/>
-		<Item Name="Prueba_acelerometro.vi" Type="VI" URL="../Prueba_acelerometro.vi"/>
-		<Item Name="Prueba_PWM.vi" Type="VI" URL="../Prueba_PWM.vi"/>
-		<Item Name="PRUEBA_A_PWM.vi" Type="VI" URL="../PRUEBA_A_PWM.vi"/>
 		<Item Name="Dependencies" Type="Dependencies"/>
 		<Item Name="Build Specifications" Type="Build">
 			<Item Name="LV_ESP32" Type="Packed Library">
