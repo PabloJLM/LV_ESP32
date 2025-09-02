@@ -13,51 +13,20 @@
 		<Property Name="server.vi.callsEnabled" Type="Bool">true</Property>
 		<Property Name="server.vi.propertiesEnabled" Type="Bool">true</Property>
 		<Property Name="specify.custom.address" Type="Bool">false</Property>
-		<Item Name="config" Type="Folder">
-			<Item Name="Detector_COM.vi" Type="VI" URL="../Detector_COM.vi"/>
-			<Item Name="Config_Wifi.vi" Type="VI" URL="../Config_Wifi.vi"/>
-			<Item Name="Compile.vi" Type="VI" URL="../Compile.vi"/>
-			<Item Name="Firmware.vi" Type="VI" URL="../Firmware.vi"/>
-			<Item Name="test_firmware.vi" Type="VI" URL="../test_firmware.vi"/>
-			<Item Name="Upload.vi" Type="VI" URL="../Upload.vi"/>
+		<Item Name="Config" Type="Folder" URL="../Config">
+			<Property Name="NI.DISK" Type="Bool">true</Property>
 		</Item>
-		<Item Name="Ejemplos" Type="Folder">
-			<Item Name="PRUEBAS.vi" Type="VI" URL="../PRUEBAS.vi"/>
-			<Item Name="Prueba_report.vi" Type="VI" URL="../Prueba_report.vi"/>
-			<Item Name="PRUEBA_ANALOG.vi" Type="VI" URL="../PRUEBA_ANALOG.vi"/>
-			<Item Name="Prueba_mqtt.vi" Type="VI" URL="../Prueba_mqtt.vi"/>
-			<Item Name="prueba_dac.vi" Type="VI" URL="../prueba_dac.vi"/>
-			<Item Name="PRUEBA_NEO_I.vi" Type="VI" URL="../PRUEBA_NEO_I.vi"/>
-			<Item Name="PRUEBA_NEO.vi" Type="VI" URL="../PRUEBA_NEO.vi"/>
-			<Item Name="PRUEBA_DIG.vi" Type="VI" URL="../PRUEBA_DIG.vi"/>
-			<Item Name="PRUEBA_A_IO.vi" Type="VI" URL="../PRUEBA_A_IO.vi"/>
-			<Item Name="Generador de funciones.vi" Type="VI" URL="../Generador de funciones.vi"/>
-			<Item Name="Prueba_acelerometro.vi" Type="VI" URL="../Prueba_acelerometro.vi"/>
-			<Item Name="Prueba_PWM.vi" Type="VI" URL="../Prueba_PWM.vi"/>
-			<Item Name="PRUEBA_A_PWM.vi" Type="VI" URL="../PRUEBA_A_PWM.vi"/>
+		<Item Name="Examples" Type="Folder" URL="../Examples">
+			<Property Name="NI.DISK" Type="Bool">true</Property>
 		</Item>
-		<Item Name="Funciones_basicas" Type="Folder">
-			<Item Name="Close_ESP.vi" Type="VI" URL="../Close_ESP.vi"/>
-			<Item Name="Open_ESP.vi" Type="VI" URL="../Open_ESP.vi"/>
-			<Item Name="Digital_Write.vi" Type="VI" URL="../Digital_Write.vi"/>
-			<Item Name="Digital_Read.vi" Type="VI" URL="../Digital_Read.vi"/>
-			<Item Name="analog_read.vi" Type="VI" URL="../analog_read.vi"/>
-			<Item Name="DAC.vi" Type="VI" URL="../DAC.vi"/>
-			<Item Name="PWM_Write.vi" Type="VI" URL="../PWM_Write.vi"/>
+		<Item Name="Funciones_Basicas" Type="Folder" URL="../Funciones_Basicas">
+			<Property Name="NI.DISK" Type="Bool">true</Property>
 		</Item>
-		<Item Name="Funciones_especiales" Type="Folder">
-			<Item Name="NP_Control.vi" Type="VI" URL="../NP_Control.vi"/>
-			<Item Name="NPI_Control.vi" Type="VI" URL="../NPI_Control.vi"/>
-			<Item Name="MQTT_PUBLISH.vi" Type="VI" URL="../MQTT_PUBLISH.vi"/>
-			<Item Name="MQTT_SUBS.vi" Type="VI" URL="../MQTT_SUBS.vi"/>
-			<Item Name="MQTT_CLOSE.vi" Type="VI" URL="../MQTT_CLOSE.vi"/>
-			<Item Name="report_view.vi" Type="VI" URL="../report_view.vi"/>
-			<Item Name="report_gen.vi" Type="VI" URL="../report_gen.vi"/>
-			<Item Name="Acelerometro.vi" Type="VI" URL="../Acelerometro.vi"/>
+		<Item Name="Funciones_Especiales" Type="Folder" URL="../Funciones_Especiales">
+			<Property Name="NI.DISK" Type="Bool">true</Property>
 		</Item>
-		<Item Name="Funciones_AUX" Type="Folder">
-			<Item Name="Signal_Gen.vi" Type="VI" URL="../Signal_Gen.vi"/>
-			<Item Name="3D_box.vi" Type="VI" URL="../3D_box.vi"/>
+		<Item Name="Funciones_AUX" Type="Folder" URL="../Funciones_AUX">
+			<Property Name="NI.DISK" Type="Bool">true</Property>
 		</Item>
 		<Item Name="LV_ESP32.lvlib" Type="Library" URL="../LV_ESP32.lvlib"/>
 		<Item Name="Dependencies" Type="Dependencies"/>
