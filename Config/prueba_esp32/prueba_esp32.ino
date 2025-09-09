@@ -2,7 +2,13 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Arduino.h>
+#include <ESP32Servo.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 
+
+
+Servo myServo;
 #define NUM_PIXELS 3
 #define PIN_NEOPIXEL 25//se asume el pin de neopixel por la board Galiot
 
@@ -186,6 +192,58 @@ void loop() {
         Serial.write('A');
         break;
       }
+
+      case 0x08: {
+        while (Serial.available() < 2);
+        byte pin = Serial.read();
+        byte angulo = Serial.read(); // 0–210 grados
+        if (angulo > 210) angulo = 210;
+        // Adjuntar el servo con rango extendido si aún no está
+        if (myServo.attached()) {
+            myServo.detach();  // liberar el pin actual
+        }
+        myServo.attach(pin, 500, 2400);
+
+        myServo.write(angulo);
+        //Serial.write('A');
+        break;
+      }
+      
+      case 0x09: {
+        // Esperamos dirección, columna y fila
+        while (Serial.available() < 3);
+
+        byte direccion = Serial.read();
+        byte col = Serial.read();
+        byte fila = Serial.read();
+
+        // Leemos el resto del texto hasta salto de línea
+        String mensaje = "";
+        while (Serial.available()) {
+          char c = Serial.read();
+          if (c == '\n') break;
+          mensaje += c;
+        }
+
+        // Creamos el objeto LCD con esa dirección (dinámico)
+        LiquidCrystal_I2C lcd(direccion, 16, 2);
+        lcd.init();
+        lcd.backlight();
+
+        // Limpiamos y escribimos en la posición indicada
+        if (fila > 1) fila = 1;       // seguridad
+        if (col > 15) col = 15;       // seguridad
+
+        lcd.setCursor(col, fila);
+        lcd.print(mensaje);
+
+        Serial.write('A'); // confirmación
+        break;
+      }
+
+
+
+
 
       case 0xF0: {
         Serial.write('A');
