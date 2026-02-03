@@ -28,7 +28,6 @@
 		<Item Name="Funciones_AUX" Type="Folder" URL="../Funciones_AUX">
 			<Property Name="NI.DISK" Type="Bool">true</Property>
 		</Item>
-		<Item Name="LV_ESP32.lvlib" Type="Library" URL="../LV_ESP32.lvlib"/>
 		<Item Name="Dependencies" Type="Dependencies"/>
 		<Item Name="Build Specifications" Type="Build">
 			<Item Name="LV_ESP32" Type="Packed Library">
@@ -54,7 +53,7 @@
 				<Property Name="Source[0].itemID" Type="Str">{C9033DDE-1FE7-411C-97B4-3CAD542577FE}</Property>
 				<Property Name="Source[0].type" Type="Str">Container</Property>
 				<Property Name="Source[1].destinationIndex" Type="Int">0</Property>
-				<Property Name="Source[1].itemID" Type="Ref">/My Computer/LV_ESP32.lvlib</Property>
+				<Property Name="Source[1].itemID" Type="Ref"></Property>
 				<Property Name="Source[1].Library.allowMissingMembers" Type="Bool">true</Property>
 				<Property Name="Source[1].Library.atomicCopy" Type="Bool">true</Property>
 				<Property Name="Source[1].Library.LVLIBPtopLevel" Type="Bool">true</Property>
