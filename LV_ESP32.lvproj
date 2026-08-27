@@ -28,9 +28,12 @@
 		<Item Name="Funciones_AUX" Type="Folder" URL="../Funciones_AUX">
 			<Property Name="NI.DISK" Type="Bool">true</Property>
 		</Item>
-		<Item Name="Test.vi" Type="VI" URL="../Test.vi"/>
-		<Item Name="Test_MO.vi" Type="VI" URL="../Test_MO.vi"/>
-		<Item Name="Test_Neo.vi" Type="VI" URL="../Test_Neo.vi"/>
+		<Item Name="firmware" Type="Folder" URL="../firmware">
+			<Property Name="NI.DISK" Type="Bool">true</Property>
+		</Item>
+		<Item Name="tools" Type="Folder" URL="../tools">
+			<Property Name="NI.DISK" Type="Bool">true</Property>
+		</Item>
 		<Item Name="Dependencies" Type="Dependencies"/>
 		<Item Name="Build Specifications" Type="Build">
 			<Item Name="LV_ESP32" Type="Packed Library">

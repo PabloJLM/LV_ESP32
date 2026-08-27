@@ -1,0 +1,33 @@
+# ===========================================================================
+#  LV_ESP32 — el repositorio guarda FUENTES.
+#  El paquete que usan los alumnos se arma con tools/make_bundle.py y se
+#  publica en GitHub Releases, no aqui.
+# ===========================================================================
+
+# arduino-cli portable y el core de Arduino (~1 GB): van en el ZIP, no en Git
+Config/arduino-cli/
+
+# PyQt5 instalado dentro del Python embebido (~60 MB): idem
+Config/python/Lib/site-packages/PyQt5/
+Config/python/Lib/site-packages/PyQt5_Qt5/
+Config/python/Lib/site-packages/PyQt5_sip*
+Config/python/Lib/site-packages/PyQt5-*
+Config/python/Lib/site-packages/PySide6*
+Config/python/Lib/site-packages/shiboken6*
+
+# paquetes generados
+dist/
+
+# compilaciones del firmware
+firmware/build/
+
+# archivos reemplazados en la migracion (esptool, instalador viejo)
+_legacy/
+
+# LabVIEW
+*.lvlps
+builds/
+
+# Python
+__pycache__/
+*.pyc
