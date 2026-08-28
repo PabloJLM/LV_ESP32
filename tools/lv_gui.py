@@ -416,8 +416,7 @@ class Launcher(QWidget):
 
         b1 = QPushButton("1.  Instalar dependencias")
         b2 = QPushButton("2.  Cargar firmware")
-        b3 = QPushButton("3.  Probar tarjeta")
-        for b in (b1, b2, b3):
+        for b in (b1, b2):
             b.setMinimumHeight(46)
             v.addWidget(b)
         v.addStretch(1)
@@ -428,7 +427,6 @@ class Launcher(QWidget):
 
         b1.clicked.connect(lambda: self.open(DepsWindow()))
         b2.clicked.connect(lambda: self.open(FlashWindow()))
-        b3.clicked.connect(lambda: self.open(ProbeWindow()))
 
     def open(self, w):
         w.setWindowTitle("LV_ESP32")
