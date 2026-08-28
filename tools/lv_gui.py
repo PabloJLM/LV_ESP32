@@ -51,26 +51,39 @@ except ImportError:
 # Estilo
 # ---------------------------------------------------------------------------
 QSS = """
-QWidget       { background:#1b1f24; color:#e6e6e6; font-size:13px; }
-QLabel#title  { font-size:20px; font-weight:600; color:#ffffff; }
-QLabel#sub    { color:#9aa4b0; }
-QLabel#field  { color:#9aa4b0; }
-QComboBox     { background:#262b32; border:1px solid #39404a; border-radius:5px;
-                padding:7px 10px; min-height:20px; }
-QComboBox:hover { border-color:#4a94d8; }
-QComboBox QAbstractItemView { background:#262b32; selection-background-color:#2f6ea5; }
-QPushButton   { background:#2f6ea5; border:none; border-radius:5px;
-                padding:9px 18px; font-weight:600; color:#ffffff; }
-QPushButton:hover    { background:#3b82c4; }
-QPushButton:disabled { background:#39404a; color:#7b838d; }
-QPushButton#ghost    { background:#262b32; border:1px solid #39404a; font-weight:500; }
-QPushButton#ghost:hover { border-color:#4a94d8; }
-QProgressBar  { background:#262b32; border:none; border-radius:4px;
-                height:8px; text-align:center; color:transparent; }
-QProgressBar::chunk { background:#4a94d8; border-radius:4px; }
-QPlainTextEdit{ background:#12161a; border:1px solid #262b32; border-radius:5px;
-                color:#b7c2ce; padding:8px; }
-QFrame#sep    { background:#262b32; max-height:1px; border:none; }
+/* Aspecto clasico de Windows: gris de sistema, bordes con relieve, sin
+   esquinas redondeadas ni acentos de color. Funcional y sobrio. */
+QWidget        { background:#f0f0f0; color:#000000;
+                 font-family:"Segoe UI","Tahoma","MS Shell Dlg 2",sans-serif;
+                 font-size:12px; }
+QLabel#title   { font-size:15px; font-weight:bold; color:#000000; }
+QLabel#sub     { color:#333333; }
+QLabel#field   { color:#000000; }
+
+QComboBox      { background:#ffffff; border:1px solid #7f9db9;
+                 padding:3px 6px; min-height:18px; }
+QComboBox:focus{ border:1px solid #3399ff; }
+QComboBox QAbstractItemView { background:#ffffff; border:1px solid #7f9db9;
+                 selection-background-color:#316ac5; selection-color:#ffffff; }
+
+QLineEdit      { background:#ffffff; border:1px solid #7f9db9; padding:3px 5px; }
+QLineEdit:focus{ border:1px solid #3399ff; }
+QLineEdit:disabled { background:#f0f0f0; color:#6d6d6d; }
+
+QPushButton    { background:#e1e1e1; border:1px solid #adadad;
+                 padding:5px 16px; min-width:80px; }
+QPushButton:hover    { background:#e5f1fb; border:1px solid #0078d7; }
+QPushButton:pressed  { background:#cce4f7; border:1px solid #005499; }
+QPushButton:disabled { background:#f0f0f0; color:#a0a0a0; border:1px solid #d0d0d0; }
+QPushButton#ghost    { background:#e1e1e1; }
+
+QProgressBar   { background:#ffffff; border:1px solid #7f9db9;
+                 height:16px; text-align:center; color:#000000; }
+QProgressBar::chunk { background:#06b025; }
+
+QPlainTextEdit { background:#ffffff; border:1px solid #7f9db9;
+                 color:#000000; padding:2px; }
+QFrame#sep     { background:#a0a0a0; max-height:1px; border:none; }
 """
 
 
@@ -153,7 +166,7 @@ class ToolWindow(QWidget):
             self.status.setText(msg)
 
     def set_status(self, msg, kind="info"):
-        color = {"ok": "#5fbf7f", "err": "#e5736b", "info": "#9aa4b0"}[kind]
+        color = {"ok": "#006600", "err": "#a00000", "info": "#333333"}[kind]
         self.status.setStyleSheet("color:%s;" % color)
         self.status.setText(msg)
 
@@ -185,19 +198,17 @@ class DepsWindow(ToolWindow):
     def __init__(self, board=None):
         super().__init__(
             "Instalar dependencias",
-            "Descarga arduino-cli, el core de Arduino y las librerias que necesita "
-            "el firmware. Todo queda dentro de la carpeta del proyecto: nada se "
-            "instala en tu usuario de Windows. Se hace una sola vez y necesita "
-            "internet.")
+            "Descarga las herramientas de Arduino que necesita el firmware. Se hace "
+            "una sola vez y necesita internet.")
 
         self.cb_board = QComboBox()
         for k, v in core.BOARDS.items():
-            self.cb_board.addItem(v["label"] + ("" if v["tested"] else "   (sin probar)"), k)
+            self.cb_board.addItem(v["label"], k)
         if board:
             i = self.cb_board.findData(board)
             if i >= 0:
                 self.cb_board.setCurrentIndex(i)
-        self.add_row(0, "Tarjeta", self.cb_board)
+        self.add_row(0, "Placa", self.cb_board)
 
         self.btn_check = QPushButton("Ver estado"); self.btn_check.setObjectName("ghost")
         self.btn_go = QPushButton("Instalar dependencias")
@@ -217,28 +228,18 @@ class DepsWindow(ToolWindow):
         st = core.status(b)
         mark = lambda ok: "OK" if ok else "FALTA"
 
-        self.append("repositorio      : %s" % core.REPO)
-        self.append("sketch           : %s   (%s)" % (mark(st["sketch"]), core.sketch_path()))
-        self.append("arduino-cli %-4s : %s" % (core.ACLI_VER, mark(st["cli"])))
-        if st["cli"]:
-            self.append("                   %s" % core.cli_path())
-        else:
-            self.append("                   se descarga solo al instalar dependencias")
-        if st.get("cli_sys"):
-            self.append("nota             : hay un arduino-cli en el PATH del sistema")
-            self.append("                   (%s) — NO se usa, para que la carpeta" % st["cli_sys"])
-            self.append("                   sea portable y la version quede fija")
-        self.append("core %-18s : %s" % (core.BOARDS[b]["core"], mark(st["core"])))
+        self.append("Firmware          : %s" % mark(st["sketch"]))
+        self.append("Herramientas      : %s" % mark(st["cli"]))
+        self.append("Soporte de placa  : %s" % mark(st["core"]))
         for lib, ok in st["libs"].items():
-            self.append("lib  %-18s : %s" % (lib, mark(ok)))
+            self.append("%-18s: %s" % (lib[:18], mark(ok)))
 
         if not st["sketch"]:
-            self.set_status("No se encontro firmware/firmware.ino en el repositorio.", "err")
+            self.set_status("No se encontro el firmware.", "err")
         elif core.all_ready(b):
             self.set_status("Todo listo. Ya puedes cargar el firmware.", "ok")
         else:
-            self.set_status("Faltan componentes. Presiona 'Instalar dependencias' "
-                            "(necesita internet, una sola vez).", "info")
+            self.set_status("Faltan componentes. Presiona 'Instalar dependencias'.", "info")
 
     def go(self):
         b = self.board()
@@ -253,17 +254,16 @@ class FlashWindow(ToolWindow):
     def __init__(self, board=None, port=None):
         super().__init__(
             "Cargar firmware",
-            "Compila el sketch y lo carga en la tarjeta. Selecciona la placa y el "
-            "puerto, y presiona Cargar firmware.")
+            "Selecciona la placa y el puerto, y presiona Cargar firmware.")
 
         self.cb_board = QComboBox()
         for k, v in core.BOARDS.items():
-            self.cb_board.addItem(v["label"] + ("" if v["tested"] else "   (sin probar)"), k)
+            self.cb_board.addItem(v["label"], k)
         if board:
             i = self.cb_board.findData(board)
             if i >= 0:
                 self.cb_board.setCurrentIndex(i)
-        self.add_row(0, "Tarjeta", self.cb_board)
+        self.add_row(0, "Placa", self.cb_board)
 
         self.cb_port = QComboBox()
         self.btn_rescan = QPushButton("Actualizar"); self.btn_rescan.setObjectName("ghost")
@@ -317,24 +317,21 @@ class ProbeWindow(ToolWindow):
     def __init__(self, port=None):
         super().__init__(
             "Probar tarjeta",
-            "Corre tools\\lv_probe.py contra la tarjeta ya flasheada: manda los "
-            "comandos del protocolo y revisa las respuestas. No necesita LabVIEW "
-            "abierto -- sirve para separar en 30 segundos si un problema es del "
-            "firmware o del VI.")
+            "Manda los comandos del protocolo a la tarjeta y revisa las respuestas.")
 
         self.cb_port = QComboBox()
         self.btn_rescan = QPushButton("Actualizar"); self.btn_rescan.setObjectName("ghost")
         self.add_row(0, "Puerto", self.cb_port, self.btn_rescan)
 
         self.ed_dio = QLineEdit("4")
-        self.add_row(1, "Pin digital (--dio)", self.ed_dio)
+        self.add_row(1, "Pin digital", self.ed_dio)
         self.ed_adc = QLineEdit("34")
-        self.add_row(2, "Pin analogico (--adc)", self.ed_adc)
+        self.add_row(2, "Pin analogico", self.ed_adc)
         self.ed_pwm = QLineEdit("13")
-        self.add_row(3, "Pin PWM (--pwm)", self.ed_pwm)
+        self.add_row(3, "Pin PWM", self.ed_pwm)
         self.ed_peer = QLineEdit("")
-        self.ed_peer.setPlaceholderText("opcional, para probar ESP-NOW con dos tarjetas")
-        self.add_row(4, "Puerto par (--peer-port)", self.ed_peer)
+        self.ed_peer.setPlaceholderText("opcional, solo para ESP-NOW")
+        self.add_row(4, "Segunda placa", self.ed_peer)
 
         self.btn_go = QPushButton("Probar")
         row = QHBoxLayout(); row.addStretch(1); row.addWidget(self.btn_go)
@@ -405,8 +402,8 @@ class Launcher(QWidget):
         v.setContentsMargins(28, 26, 28, 26)
         v.setSpacing(12)
 
-        t = QLabel("LV_ESP32 — Configuracion"); t.setObjectName("title")
-        s = QLabel("Herramientas de instalacion. La instrumentacion se hace desde LabVIEW.")
+        t = QLabel("LV_ESP32"); t.setObjectName("title")
+        s = QLabel("Preparar la tarjeta para usarla desde LabVIEW.")
         s.setObjectName("sub"); s.setWordWrap(True)
         v.addWidget(t); v.addWidget(s)
 
@@ -414,8 +411,8 @@ class Launcher(QWidget):
         v.addWidget(sep)
         v.addSpacing(6)
 
-        b1 = QPushButton("1.  Instalar dependencias")
-        b2 = QPushButton("2.  Cargar firmware")
+        b1 = QPushButton("Instalar dependencias")
+        b2 = QPushButton("Cargar firmware")
         for b in (b1, b2):
             b.setMinimumHeight(46)
             v.addWidget(b)
