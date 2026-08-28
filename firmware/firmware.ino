@@ -64,7 +64,7 @@
   #include "lv_espnow.h"
 #endif
 
-#define NUM_PIXELS 3
+#define NUM_PIXELS 16
 #define TIMEOUT_MS 200
 
 Adafruit_NeoPixel pixels(NUM_PIXELS, LV_NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
