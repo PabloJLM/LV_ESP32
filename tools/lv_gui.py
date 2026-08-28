@@ -29,7 +29,7 @@ try:
     from PyQt5.QtCore import Qt, QThread, pyqtSignal as SignalT
     from PyQt5.QtGui import QFont
     from PyQt5.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
-                                 QHBoxLayout, QLabel, QPlainTextEdit,
+                                 QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
                                  QProgressBar, QPushButton, QVBoxLayout, QWidget)
     QT_NAME = "PyQt5"
 except ImportError:
@@ -37,7 +37,7 @@ except ImportError:
         from PySide6.QtCore import Qt, QThread, Signal as SignalT
         from PySide6.QtGui import QFont
         from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
-                                       QHBoxLayout, QLabel, QPlainTextEdit,
+                                       QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
                                        QProgressBar, QPushButton, QVBoxLayout, QWidget)
         QT_NAME = "PySide6"
     except ImportError:
@@ -311,6 +311,87 @@ class FlashWindow(ToolWindow):
 
 
 # ---------------------------------------------------------------------------
+# Herramienta 3 -- probar el protocolo contra la tarjeta real
+# ---------------------------------------------------------------------------
+class ProbeWindow(ToolWindow):
+    def __init__(self, port=None):
+        super().__init__(
+            "Probar tarjeta",
+            "Corre tools\\lv_probe.py contra la tarjeta ya flasheada: manda los "
+            "comandos del protocolo y revisa las respuestas. No necesita LabVIEW "
+            "abierto -- sirve para separar en 30 segundos si un problema es del "
+            "firmware o del VI.")
+
+        self.cb_port = QComboBox()
+        self.btn_rescan = QPushButton("Actualizar"); self.btn_rescan.setObjectName("ghost")
+        self.add_row(0, "Puerto", self.cb_port, self.btn_rescan)
+
+        self.ed_dio = QLineEdit("4")
+        self.add_row(1, "Pin digital (--dio)", self.ed_dio)
+        self.ed_adc = QLineEdit("34")
+        self.add_row(2, "Pin analogico (--adc)", self.ed_adc)
+        self.ed_pwm = QLineEdit("13")
+        self.add_row(3, "Pin PWM (--pwm)", self.ed_pwm)
+        self.ed_peer = QLineEdit("")
+        self.ed_peer.setPlaceholderText("opcional, para probar ESP-NOW con dos tarjetas")
+        self.add_row(4, "Puerto par (--peer-port)", self.ed_peer)
+
+        self.btn_go = QPushButton("Probar")
+        row = QHBoxLayout(); row.addStretch(1); row.addWidget(self.btn_go)
+        self.root.insertLayout(4, row)   # justo debajo del formulario
+
+        self.btn_rescan.clicked.connect(self.rescan)
+        self.btn_go.clicked.connect(self.go)
+        self.rescan(preferred=port)
+
+    def rescan(self, checked=False, preferred=None):
+        self.cb_port.clear()
+        ports = core.list_ports()
+        if not ports:
+            self.cb_port.addItem("(no hay puertos)", "")
+            self.set_status("Conecta la tarjeta por USB y presiona Actualizar.", "err")
+            self.btn_go.setEnabled(False)
+            return
+        for p in ports:
+            txt = p["port"] + (("  --  " + p["label"]) if p["label"] else "")
+            self.cb_port.addItem(txt, p["port"])
+        target = preferred or core.guess_port(DEFAULT_BOARD, ports)
+        if target:
+            i = self.cb_port.findData(target)
+            if i >= 0:
+                self.cb_port.setCurrentIndex(i)
+        self.btn_go.setEnabled(True)
+        self.set_status("%d puerto(s) encontrado(s)." % len(ports), "info")
+
+    def _int_or_none(self, text):
+        text = text.strip()
+        if not text:
+            return None
+        try:
+            return int(text)
+        except ValueError:
+            return None
+
+    def go(self):
+        p = self.cb_port.currentData()
+        if not p:
+            self.set_status("Selecciona un puerto.", "err")
+            return
+        peer = self.ed_peer.text().strip() or None
+        dio, adc, pwm = (self._int_or_none(self.ed_dio.text()),
+                         self._int_or_none(self.ed_adc.text()),
+                         self._int_or_none(self.ed_pwm.text()))
+
+        self.start(lambda line, step: core.run_probe(
+                       p, line, step, peer_port=peer, dio=dio, adc=adc, pwm=pwm),
+                   [self.btn_go, self.btn_rescan, self.cb_port,
+                    self.ed_dio, self.ed_adc, self.ed_pwm, self.ed_peer])
+
+
+DEFAULT_BOARD = core.DEFAULT_BOARD
+
+
+# ---------------------------------------------------------------------------
 # Lanzador
 # ---------------------------------------------------------------------------
 class Launcher(QWidget):
@@ -335,7 +416,8 @@ class Launcher(QWidget):
 
         b1 = QPushButton("1.  Instalar dependencias")
         b2 = QPushButton("2.  Cargar firmware")
-        for b in (b1, b2):
+        b3 = QPushButton("3.  Probar tarjeta")
+        for b in (b1, b2, b3):
             b.setMinimumHeight(46)
             v.addWidget(b)
         v.addStretch(1)
@@ -346,6 +428,7 @@ class Launcher(QWidget):
 
         b1.clicked.connect(lambda: self.open(DepsWindow()))
         b2.clicked.connect(lambda: self.open(FlashWindow()))
+        b3.clicked.connect(lambda: self.open(ProbeWindow()))
 
     def open(self, w):
         w.setWindowTitle("LV_ESP32")
@@ -356,7 +439,7 @@ class Launcher(QWidget):
 # ---------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tool", choices=["deps", "flash"], default=None)
+    ap.add_argument("--tool", choices=["deps", "flash", "probe"], default=None)
     ap.add_argument("--board", default=None)
     ap.add_argument("--port", default=None)
     a = ap.parse_args()
@@ -368,6 +451,8 @@ def main():
         w = DepsWindow(a.board)
     elif a.tool == "flash":
         w = FlashWindow(a.board, a.port)
+    elif a.tool == "probe":
+        w = ProbeWindow(a.port)
     else:
         w = Launcher()
 

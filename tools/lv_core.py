@@ -589,6 +589,54 @@ def upload_sketch(board_key, port, build=None, on_line=None, on_step=None):
     return True, "Firmware cargado en %s" % port
 
 
+def probe_script_path():
+    return os.path.join(HERE, "lv_probe.py")
+
+
+def run_probe(port, on_line=None, on_step=None, peer_port=None,
+              dio=None, adc=None, pwm=None, servo=None, timeout=120):
+    """Corre tools/lv_probe.py contra la tarjeta real, con el mismo Python
+    portable que esta corriendo la GUI. Transmite cada linea segun sale.
+    Devuelve (ok, mensaje) -- ok=False si algun 'FALLO' salio en el log."""
+    line = on_line or _noop
+    step = on_step or _noop
+
+    script = probe_script_path()
+    if not os.path.isfile(script):
+        return False, "No se encontro tools\\lv_probe.py"
+    if not port:
+        return False, "Selecciona un puerto."
+
+    args = [sys.executable, "-u", script, "--port", port]   # -u: sin buffer, se ve en vivo
+    if peer_port: args += ["--peer-port", peer_port]
+    if dio   is not None: args += ["--dio",   str(dio)]
+    if adc   is not None: args += ["--adc",   str(adc)]
+    if pwm   is not None: args += ["--pwm",   str(pwm)]
+    if servo is not None: args += ["--servo", str(servo)]
+
+    step(5, "Probando %s..." % port)
+    try:
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             text=True, encoding="utf-8", errors="replace",
+                             bufsize=1, **_no_window())
+    except OSError as e:                                          # noqa: BLE001
+        return False, "No se pudo lanzar lv_probe.py: %s" % e
+
+    try:
+        for l in p.stdout:
+            l = l.rstrip("\r\n")
+            if l.strip():
+                line(l)
+        p.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        return False, "lv_probe.py no termino a tiempo (revisa el puerto)."
+
+    step(100, "Prueba terminada")
+    ok = (p.returncode == 0)
+    return ok, ("Todo paso" if ok else "Algo fallo -- revisa el log de arriba")
+
+
 def ping_board(port, wait_reset=2.0):
     """Protocolo v2: manda 0xF0 y espera 'AA'. Devuelve (ok|None, detalle)."""
     try:

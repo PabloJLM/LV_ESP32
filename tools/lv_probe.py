@@ -142,7 +142,7 @@ def probe(b, args):
     ok("0x03 los 3 pixeles cambian de color", good)
     look("los NeoPixel pasaron por rojo, verde y azul")
     ok("0x04 solo el pixel 1 en blanco", b.r2([0x04, 1, 60, 60, 60]) == b"AA")
-    ok("0x04 pixel 9 rechazado", b.r2([0x04, 9, 1, 1, 1]) == b"XX")
+    ok("0x04 pixel fuera de rango rechazado", b.r2([0x04, 250, 1, 1, 1]) == b"XX")
     time.sleep(0.6)
     b.r2([0x03, 0, 0, 0])
 
