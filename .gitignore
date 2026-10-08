@@ -21,8 +21,8 @@ dist/
 # compilaciones del firmware
 firmware/build/
 
-# archivos reemplazados en la migracion (esptool, instalador viejo)
-_legacy/
+# la wiki es otro repositorio (se clona aqui para editarla, no se versiona)
+LV_ESP32.wiki/
 
 # LabVIEW
 *.lvlps

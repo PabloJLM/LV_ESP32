@@ -31,7 +31,7 @@ DIST = os.path.join(core.REPO, "dist")
 
 # Lo que NUNCA entra al paquete
 EXCLUDE_DIRS = {
-    "_legacy", ".git", ".github", "dist", "__pycache__",
+    "LV_ESP32.wiki", ".git", ".github", "dist", "__pycache__",
     "build",                       # compilaciones locales
     "downloads",                   # cache de descargas de arduino-cli
 }
