@@ -1,23 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-make_bundle.py — LV_ESP32
-Arma el ZIP distribuible para los alumnos.
-
-El repositorio de Git guarda FUENTES. Este script produce el PAQUETE: una
-carpeta que ya trae Python, PyQt5, arduino-cli y el core de Arduino adentro,
-para que el alumno la descomprima y funcione SIN internet y SIN instalar nada.
-
-    Config\\python\\python.exe tools\\make_bundle.py
-    Config\\python\\python.exe tools\\make_bundle.py --boards esp32_devkit,esp32_devkit_espnow
-    Config\\python\\python.exe tools\\make_bundle.py --no-core     (paquete liviano)
-
-Antes de correrlo, en TU maquina tiene que estar todo listo:
-    1) Config\\python\\python.exe -m pip install PyQt5
-    2) abrir lv_gui.bat -> Instalar dependencias  (para cada tarjeta que incluyas)
-
-El resultado queda en  dist\\LV_ESP32_Portable_<fecha>.zip
-"""
-
 import argparse
 import os
 import shutil
