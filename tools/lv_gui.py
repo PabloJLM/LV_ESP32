@@ -51,39 +51,41 @@ except ImportError:
 # Estilo
 # ---------------------------------------------------------------------------
 QSS = """
-/* Aspecto clasico de Windows: gris de sistema, bordes con relieve, sin
-   esquinas redondeadas ni acentos de color. Funcional y sobrio. */
-QWidget        { background:#f0f0f0; color:#000000;
+/* Paleta tipo LabVIEW: blanco, amarillos calidos y amarillo oscuro.
+   Sin esquinas redondeadas; relieve sobrio. */
+QWidget        { background:#fffdf0; color:#2b2100;
                  font-family:"Segoe UI","Tahoma","MS Shell Dlg 2",sans-serif;
                  font-size:12px; }
-QLabel#title   { font-size:15px; font-weight:bold; color:#000000; }
-QLabel#sub     { color:#333333; }
-QLabel#field   { color:#000000; }
+QLabel#title   { font-size:15px; font-weight:bold; color:#6b5200;
+                 background:#ffe27a; border-bottom:2px solid #b38600;
+                 padding:6px 8px; }
+QLabel#sub     { color:#5a4600; }
+QLabel#field   { color:#2b2100; }
 
-QComboBox      { background:#ffffff; border:1px solid #7f9db9;
+QComboBox      { background:#ffffff; border:1px solid #b38600;
                  padding:3px 6px; min-height:18px; }
-QComboBox:focus{ border:1px solid #3399ff; }
-QComboBox QAbstractItemView { background:#ffffff; border:1px solid #7f9db9;
-                 selection-background-color:#316ac5; selection-color:#ffffff; }
+QComboBox:focus{ border:1px solid #8a6a00; background:#fffbe0; }
+QComboBox QAbstractItemView { background:#ffffff; border:1px solid #b38600;
+                 selection-background-color:#b38600; selection-color:#ffffff; }
 
-QLineEdit      { background:#ffffff; border:1px solid #7f9db9; padding:3px 5px; }
-QLineEdit:focus{ border:1px solid #3399ff; }
-QLineEdit:disabled { background:#f0f0f0; color:#6d6d6d; }
+QLineEdit      { background:#ffffff; border:1px solid #b38600; padding:3px 5px; }
+QLineEdit:focus{ border:1px solid #8a6a00; background:#fffbe0; }
+QLineEdit:disabled { background:#f3efd8; color:#8c8466; }
 
-QPushButton    { background:#e1e1e1; border:1px solid #adadad;
-                 padding:5px 16px; min-width:80px; }
-QPushButton:hover    { background:#e5f1fb; border:1px solid #0078d7; }
-QPushButton:pressed  { background:#cce4f7; border:1px solid #005499; }
-QPushButton:disabled { background:#f0f0f0; color:#a0a0a0; border:1px solid #d0d0d0; }
-QPushButton#ghost    { background:#e1e1e1; }
+QPushButton    { background:#f7c92b; border:1px solid #8a6a00;
+                 padding:5px 16px; min-width:80px; color:#2b2100; }
+QPushButton:hover    { background:#ffdc5e; border:1px solid #6b5200; }
+QPushButton:pressed  { background:#d9a900; border:1px solid #6b5200; }
+QPushButton:disabled { background:#f3efd8; color:#a39a78; border:1px solid #d6cda6; }
+QPushButton#ghost    { background:#fff3c2; }
 
-QProgressBar   { background:#ffffff; border:1px solid #7f9db9;
-                 height:16px; text-align:center; color:#000000; }
-QProgressBar::chunk { background:#06b025; }
+QProgressBar   { background:#ffffff; border:1px solid #b38600;
+                 height:16px; text-align:center; color:#2b2100; }
+QProgressBar::chunk { background:#e0a800; }
 
-QPlainTextEdit { background:#ffffff; border:1px solid #7f9db9;
-                 color:#000000; padding:2px; }
-QFrame#sep     { background:#a0a0a0; max-height:1px; border:none; }
+QPlainTextEdit { background:#ffffff; border:1px solid #b38600;
+                 color:#2b2100; padding:2px; }
+QFrame#sep     { background:#b38600; max-height:1px; border:none; }
 """
 
 
@@ -166,7 +168,7 @@ class ToolWindow(QWidget):
             self.status.setText(msg)
 
     def set_status(self, msg, kind="info"):
-        color = {"ok": "#006600", "err": "#a00000", "info": "#333333"}[kind]
+        color = {"ok": "#006600", "err": "#a00000", "info": "#5a4600"}[kind]
         self.status.setStyleSheet("color:%s;" % color)
         self.status.setText(msg)
 
