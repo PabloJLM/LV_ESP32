@@ -3,196 +3,137 @@
 lv_core.py — LV_ESP32
 Backend de configuracion. Todo lo que no es instrumentacion vive aqui.
 
-Asume un clon limpio del repositorio:
+El repositorio NO compila nada: los binarios ya vienen hechos en firmware/bin/
+(un archivo por tarjeta, ver firmware/COMPILAR.md). Aqui solo se cargan, cada
+tarjeta con su herramienta nativa, que va portable en Config/flashtools/:
 
-    LV_ESP32/
-      Config/python/          Python embebido (ya viene en el repo)
-      firmware/firmware.ino   el sketch
-      tools/                  este archivo, lv_gui.py, lv_gui.bat
+    ESP32 Wrover (USB y USB + WiFi/FTP)   esptool.exe
+    Arduino Nano ESP32                    dfu-util.exe
+    Arduino UNO / Nano                    avrdude.exe + avrdude.conf
+    Nucleo F303K8 (K8)                    sin herramienta: se copia el .bin a la
+                                          unidad NODE_F303K8 del ST-Link
 
-Lo que falte lo instala solo, dentro del repo:
-      Config/arduino-cli/     se descarga y verifica en el primer uso
-      Config/arduino-cli/data cores y librerias de Arduino
+    <raiz>/
+      LV_Firmware.exe  (o tools/lv_gui.py en desarrollo)
+      Config/flashtools/{esptool,dfu-util,avrdude}/
+      firmware/bin/*.bin|*.hex
 
-Nada se instala en %LOCALAPPDATA% ni en el perfil del usuario: la carpeta
-completa sigue siendo portable.
-
-Solo stdlib.
+Nada se instala en %LOCALAPPDATA% ni en el perfil del usuario.
+Solo stdlib (esptool y pyserial se usan como paquetes de Python).
 """
 
-import hashlib
-import json
 import os
+import re
 import shutil
 import subprocess
 import sys
-import zipfile
 
 # ---------------------------------------------------------------------------
-# Rutas (este archivo vive en <repo>/tools/)
+# Rutas (este archivo vive en <repo>/tools/, o junto al .exe)
 # ---------------------------------------------------------------------------
-HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)
+FROZEN = bool(getattr(sys, "frozen", False))     # True dentro del .exe de PyInstaller
+if FROZEN:
+    HERE = os.path.dirname(os.path.abspath(sys.executable))
+    REPO = HERE                                   # el .exe vive en la raiz
+else:
+    HERE = os.path.dirname(os.path.abspath(__file__))
+    REPO = os.path.dirname(HERE)                  # tools/ esta un nivel abajo
 
-CLI_HOME   = os.path.join(REPO, "Config", "arduino-cli")
-SKETCH_DIR = os.path.join(REPO, "firmware")            # firmware/firmware.ino
-BUILD_ROOT = os.path.join(REPO, "firmware", "build")
+BIN_DIR = os.path.join(REPO, "firmware", "bin")
+FLASHTOOLS_DIR = os.path.join(REPO, "Config", "flashtools")
 
-IS_WIN   = os.name == "nt"
-EXE_NAME = "arduino-cli.exe" if IS_WIN else "arduino-cli"
-
-# ---------------------------------------------------------------------------
-# arduino-cli: version fija a proposito.
-# "latest" cambia sin avisar y un cambio en --format json rompería la GUI a
-# mitad de semestre. Para actualizar, se cambian estas cuatro constantes.
-# ---------------------------------------------------------------------------
-ACLI_VER = "1.3.1"
-ACLI_ASSET = {
-    "win":   ("arduino-cli_%s_Windows_64bit.zip" % ACLI_VER,
-              "cfece6f356fdc9ca003cc3f0a488470030719c8e0e7bfce5e42ac9410d87441f"),
-    "linux": ("arduino-cli_%s_Linux_64bit.tar.gz" % ACLI_VER, None),
-}
-ACLI_BASE = "https://github.com/arduino/arduino-cli/releases/download/v%s/" % ACLI_VER
-
-ESP32_URL = "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
+IS_WIN = os.name == "nt"
 
 # ---------------------------------------------------------------------------
 # Catalogo de tarjetas
 #
-# Las cuatro comparten el core esp32:esp32, asi que el MISMO firmware.ino
-# compila para todas sin tocar una linea. 'tested' marca las que ya encendiste.
-# Agregar una tarjeta nueva = cinco lineas aqui.
+# La clave = nombre del entorno de platformio.ini = nombre del archivo en
+# firmware/bin/. Los pines de cada tarjeta estan en firmware/lv_boards.h y en
+# firmware/PINOUT.md; aqui solo se dice como se carga su binario.
+#
+#   method       "esptool" | "dfu" | "avrdude" | "stlink_copy"
+#   bin          archivo por defecto dentro de firmware/bin/
+#   chip, baud   esptool: chip y velocidad. avrdude: baud del bootloader.
+#   needs_port   False = la carga NO usa el puerto serie. Default True.
+#   post_vidpid  VID/PID del puerto con el que habla el firmware despues de
+#                cargar; sirve para encontrarlo solo.
+#   online       True = tiene los comandos WiFi/FTP (0xC1..0xC6).
+#   note         texto que la GUI muestra al elegir la tarjeta.
 # ---------------------------------------------------------------------------
-ESP32_LIBS = ["Adafruit NeoPixel", "ESP32Servo", "LiquidCrystal I2C"]
-AVR_LIBS   = ["Adafruit NeoPixel", "Servo", "LiquidCrystal I2C"]
+_WROVER_VIDPID = [("10C4", "EA60"), ("1A86", "7523"), ("1A86", "55D4"),
+                  ("0403", "6001")]
+_NANO32_VIDPID = [("2341", None), ("303A", None)]
+_STLINK_VIDPID = [("0483", "374B"), ("0483", "374E"), ("0483", "3752")]
+_NANO32_NOTE = ("Antes de cargar: doble clic rapido en RESET (el LED verde queda "
+                "fijo). Esta placa se carga por DFU.")
 
 BOARDS = {
-    # --- ESP32 sin WiFi: la variante base, la mas rapida y estable ---------
-    "esp32_devkit": {
-        "label":  "ESP32 Dev Module  ·  USB",
-        "fqbn":   "esp32:esp32:esp32",
-        "core":   "esp32:esp32",
-        "url":    ESP32_URL,
-        "libs":   ESP32_LIBS,
-        "flags":  "",
-        "speed":  "921600",
-        "tested": True,
-        "vidpid": [("10C4", "EA60"), ("1A86", "7523"), ("1A86", "55D4"),
-                   ("0403", "6001"), ("303A", None)],
-    },
-    # --- ESP32 + ESP-NOW: mismo protocolo por USB, mas 3 comandos de radio -
-    "esp32_devkit_espnow": {
-        "label":  "ESP32 Dev Module  ·  USB + ESP-NOW",
-        "fqbn":   "esp32:esp32:esp32",
-        "core":   "esp32:esp32",
-        "url":    ESP32_URL,
-        "libs":   ESP32_LIBS,
-        "flags":  "-DLV_ESPNOW",
-        "speed":  "921600",
-        "tested": False,
-        "vidpid": [("10C4", "EA60"), ("1A86", "7523"), ("1A86", "55D4"),
-                   ("0403", "6001"), ("303A", None)],
-    },
     "esp32_wrover": {
-        "label":  "ESP32 Wrover Module  ·  USB",
-        "fqbn":   "esp32:esp32:esp32wrover",
-        "core":   "esp32:esp32",
-        "url":    ESP32_URL,
-        "libs":   ESP32_LIBS,
-        "flags":  "",
-        "speed":  "921600",
-        "tested": False,
-        "vidpid": [("10C4", "EA60"), ("1A86", "7523")],
+        "label":  "ESP32 Wrover - Welcome Kit UG  ·  USB",
+        "method": "esptool",
+        "bin":    "esp32_wrover.bin",
+        "chip":   "esp32",
+        "baud":   "921600",
+        "vidpid": _WROVER_VIDPID,
     },
-    "esp32_s3": {
-        "label":  "ESP32-S3 Dev Module  ·  USB  (sin DAC)",
-        "fqbn":   "esp32:esp32:esp32s3",
-        "core":   "esp32:esp32",
-        "url":    ESP32_URL,
-        "libs":   ESP32_LIBS,
-        "flags":  "",
-        "speed":  "921600",
-        "tested": False,
-        "vidpid": [("303A", None), ("10C4", "EA60")],
+    "esp32_wrover_online": {
+        "label":  "ESP32 Wrover - Welcome Kit UG  ·  USB + WiFi/FTP (SD por SPI)",
+        "method": "esptool",
+        "bin":    "esp32_wrover_online.bin",
+        "chip":   "esp32",
+        "baud":   "921600",
+        "online": True,
+        "vidpid": _WROVER_VIDPID,
     },
-    # --- Arduino Nano ESP32: placa OFICIAL de Arduino con ESP32-S3 --------
-    #     Usa el core de Espressif (nano_nora), el mismo que ya tienes.
-    #     No tiene DAC (es S3) y su numeracion de pines es la de Arduino,
-    #     por eso el NeoPixel se fija con una bandera.
-    "arduino_nano_esp32": {
+    "nano_esp32": {
         "label":  "Arduino Nano ESP32  ·  USB  (sin DAC)",
-        "fqbn":   "esp32:esp32:nano_nora",
-        "core":   "esp32:esp32",
-        "url":    ESP32_URL,
-        "libs":   ESP32_LIBS,
-        "flags":  "-DLV_NEOPIXEL_PIN=5",
-        "speed":  None,
-        "tested": False,
-        "vidpid": [("2341", None), ("303A", None)],
+        "method": "dfu",
+        "bin":    "nano_esp32.bin",
+        "dfu_id": "2341:0070",
+        "needs_port": False,                 # en modo DFU no hay puerto COM
+        "note":   _NANO32_NOTE,
+        "vidpid": _NANO32_VIDPID,
+        "post_vidpid": _NANO32_VIDPID,
     },
-    "arduino_nano_esp32_espnow": {
-        "label":  "Arduino Nano ESP32  ·  USB + ESP-NOW  (sin DAC)",
-        "fqbn":   "esp32:esp32:nano_nora",
-        "core":   "esp32:esp32",
-        "url":    ESP32_URL,
-        "libs":   ESP32_LIBS,
-        "flags":  "-DLV_ESPNOW -DLV_NEOPIXEL_PIN=5",
-        "speed":  None,
-        "tested": False,
-        "vidpid": [("2341", None), ("303A", None)],
+    "nano_esp32_online": {
+        "label":  "Arduino Nano ESP32  ·  USB + WiFi/FTP (SD por SPI)",
+        "method": "dfu",
+        "bin":    "nano_esp32_online.bin",
+        "dfu_id": "2341:0070",
+        "needs_port": False,
+        "online": True,
+        "note":   _NANO32_NOTE,
+        "vidpid": _NANO32_VIDPID,
+        "post_vidpid": _NANO32_VIDPID,
     },
-    # --- ESP32 Wrover + ESP-NOW -------------------------------------------
-    "esp32_wrover_espnow": {
-        "label":  "ESP32 Wrover Module  ·  USB + ESP-NOW",
-        "fqbn":   "esp32:esp32:esp32wrover",
-        "core":   "esp32:esp32",
-        "url":    ESP32_URL,
-        "libs":   ESP32_LIBS,
-        "flags":  "-DLV_ESPNOW",
-        "speed":  "921600",
-        "tested": False,
-        "vidpid": [("10C4", "EA60"), ("1A86", "7523")],
+    # Nucleo F303K8: el ST-Link aparece como una unidad NODE_F303K8 y se le copia
+    # el .bin. No necesita herramienta ni drivers. El protocolo va por el VCP
+    # del mismo ST-Link. DAC real en PA4.
+    "nucleo_f303k8": {
+        "label":  "Nucleo F303K8 (K8)  ·  USB (ST-Link)",
+        "method": "stlink_copy",
+        "bin":    "nucleo_f303k8.bin",
+        "needs_port":  False,
+        "post_vidpid": _STLINK_VIDPID,
+        "vidpid": _STLINK_VIDPID,
     },
-    # --- Arduino clasicas: mismo protocolo, sin DAC -----------------------
-    "arduino_uno": {
+    "uno": {
         "label":  "Arduino UNO R3  ·  USB  (sin DAC)",
-        "fqbn":   "arduino:avr:uno",
-        "core":   "arduino:avr",
-        "url":    None,
-        "libs":   AVR_LIBS,
-        "flags":  "",
-        "speed":  None,
-        "tested": False,
+        "method": "avrdude",
+        "bin":    "uno.hex",
+        "baud":   115200,                    # optiboot
         "vidpid": [("2341", None), ("1A86", "7523")],
     },
-    "arduino_nano": {
+    "nano": {
         "label":  "Arduino Nano (bootloader viejo)  ·  USB  (sin DAC)",
-        "fqbn":   "arduino:avr:nano:cpu=atmega328old",
-        "core":   "arduino:avr",
-        "url":    None,
-        "libs":   AVR_LIBS,
-        "flags":  "",
-        "speed":  None,
-        "tested": False,
+        "method": "avrdude",
+        "bin":    "nano.hex",
+        "baud":   57600,                     # bootloader viejo; el nuevo usa 115200
         "vidpid": [("1A86", "7523"), ("0403", "6001")],
-    },
-    "arduino_mega": {
-        "label":  "Arduino MEGA 2560  ·  USB  (sin DAC)",
-        "fqbn":   "arduino:avr:mega:cpu=atmega2560",
-        "core":   "arduino:avr",
-        "url":    None,
-        "libs":   AVR_LIBS,
-        "flags":  "",
-        "speed":  None,
-        "tested": False,
-        "vidpid": [("2341", None)],
     },
 }
 
-DEFAULT_BOARD = "esp32_devkit"
-
-def board_libs(board_key):
-    return BOARDS[board_key]["libs"]
+DEFAULT_BOARD = "esp32_wrover"
 
 
 # ---------------------------------------------------------------------------
@@ -211,247 +152,76 @@ def _no_window():
     return {"startupinfo": si, "creationflags": 0x08000000}   # CREATE_NO_WINDOW
 
 
-def cli_path():
-    """SOLO el arduino-cli que vive dentro del repositorio.
-
-    A proposito NO se usa el del PATH aunque exista: el objetivo es que la
-    carpeta sea portable y que la version quede fija. Si tomaramos el del
-    sistema, funcionaria en la maquina del desarrollador y fallaria en la del
-    alumno, que es justo el bug que no queremos."""
-    local = os.path.join(CLI_HOME, EXE_NAME)
-    return local if os.path.isfile(local) else None
-
-
-def system_cli_path():
-    """El arduino-cli del sistema, si lo hay. Solo informativo."""
-    return shutil.which("arduino-cli")
+def _python_exe():
+    """python.exe junto al interprete actual. La GUI corre con pythonw.exe,
+    que no tiene consola; para lanzar herramientas con salida usamos python.exe
+    (sin ventana, ver _no_window)."""
+    exe = sys.executable
+    if os.path.basename(exe).lower() == "pythonw.exe":
+        alt = os.path.join(os.path.dirname(exe), "python.exe")
+        if os.path.isfile(alt):
+            return alt
+    return exe
 
 
-def cli_ready():
-    return cli_path() is not None
+def bin_path(board_key):
+    return os.path.join(BIN_DIR, BOARDS[board_key]["bin"])
 
 
-def sketch_path():
-    return os.path.join(SKETCH_DIR, "firmware.ino")
+def bin_ok(board_key):
+    return os.path.isfile(bin_path(board_key))
 
 
-def sketch_ok():
-    return os.path.isfile(sketch_path())
+def _tool(folder, exe):
+    """Ruta de una herramienta nativa portable, o None si no esta."""
+    name = exe + (".exe" if IS_WIN else "")
+    p = os.path.join(FLASHTOOLS_DIR, folder, name)
+    return p if os.path.isfile(p) else None
 
 
-# ---------------------------------------------------------------------------
-# Instalar arduino-cli (auto, en el primer uso)
-# ---------------------------------------------------------------------------
-def install_cli(on_line=None, on_step=None):
-    """Descarga arduino-cli, verifica el hash y lo deja en Config/arduino-cli/.
-    Devuelve (ok, mensaje)."""
-    line = on_line or _noop
-    step = on_step or _noop
-
-    if cli_ready():
-        line("arduino-cli ya esta instalado: %s" % cli_path())
-        return True, "arduino-cli listo"
-
-    import urllib.request
-
-    key = "win" if IS_WIN else "linux"
-    asset, want_sha = ACLI_ASSET[key]
-    url = ACLI_BASE + asset
-
-    os.makedirs(CLI_HOME, exist_ok=True)
-    tmp = os.path.join(CLI_HOME, asset)
-
-    step(3, "Descargando arduino-cli %s..." % ACLI_VER)
-    line("Origen: " + url)
-    try:
-        with urllib.request.urlopen(url, timeout=120) as r, open(tmp, "wb") as f:
-            total = int(r.headers.get("Content-Length") or 0)
-            got, last = 0, -1
-            while True:
-                chunk = r.read(256 * 1024)
-                if not chunk:
-                    break
-                f.write(chunk)
-                got += len(chunk)
-                if total:
-                    pct = int(100 * got / total)
-                    if pct >= last + 10:          # avisa cada 10 %, no cada bloque
-                        last = pct
-                        step(3 + int(9 * got / total),
-                             "Descargando arduino-cli... %d %%" % pct)
-    except Exception as e:                                    # noqa: BLE001
-        return False, ("No se pudo descargar arduino-cli (%s). Revisa la conexion "
-                       "a internet o copia %s a mano en Config\\arduino-cli\\"
-                       % (e, EXE_NAME))
-
-    if want_sha:
-        step(12, "Verificando la descarga...")
-        h = hashlib.sha256()
-        with open(tmp, "rb") as f:
-            for blk in iter(lambda: f.read(1 << 20), b""):
-                h.update(blk)
-        got_sha = h.hexdigest()
-        line("SHA256 esperado : " + want_sha)
-        line("SHA256 obtenido : " + got_sha)
-        if got_sha != want_sha:
-            os.remove(tmp)
-            return False, "La descarga de arduino-cli no coincide con el hash oficial."
-
-    step(14, "Extrayendo...")
-    try:
-        if asset.endswith(".zip"):
-            with zipfile.ZipFile(tmp) as z:
-                for name in z.namelist():
-                    base = os.path.basename(name)
-                    if base in (EXE_NAME, "LICENSE.txt"):
-                        dest = os.path.join(
-                            CLI_HOME,
-                            "LICENSE_arduino-cli.txt" if base == "LICENSE.txt" else base)
-                        with z.open(name) as src, open(dest, "wb") as out:
-                            shutil.copyfileobj(src, out)
-        else:
-            import tarfile
-            with tarfile.open(tmp) as t:
-                for m in t.getmembers():
-                    if os.path.basename(m.name) == EXE_NAME:
-                        m.name = EXE_NAME
-                        t.extract(m, CLI_HOME)
-    except Exception as e:                                    # noqa: BLE001
-        return False, "No se pudo extraer arduino-cli: %s" % e
-    finally:
+def esptool_cmd():
+    """['esptool.exe'] si esta en Config/flashtools; si no, el paquete de Python
+    (solo en desarrollo, nunca dentro del .exe). None si no hay ninguno."""
+    exe = _tool("esptool", "esptool")
+    if exe:
+        return [exe]
+    if not FROZEN:
         try:
-            os.remove(tmp)
-        except OSError:
+            import importlib.util
+            if importlib.util.find_spec("esptool") is not None:
+                return [_python_exe(), "-u", "-m", "esptool"]
+        except Exception:                                         # noqa: BLE001
             pass
-
-    exe = os.path.join(CLI_HOME, EXE_NAME)
-    if not os.path.isfile(exe):
-        return False, "La extraccion no dejo %s" % EXE_NAME
-    if not IS_WIN:
-        os.chmod(exe, 0o755)
-
-    line("Instalado en: " + exe)
-    step(15, "arduino-cli listo")
-    return True, "arduino-cli %s instalado" % ACLI_VER
+    return None
 
 
-# ---------------------------------------------------------------------------
-# Llamadas a arduino-cli
-# ---------------------------------------------------------------------------
-def cli_env():
-    """Fuerza a arduino-cli a vivir dentro del repo."""
-    env = os.environ.copy()
-    env["ARDUINO_DIRECTORIES_DATA"]      = os.path.join(CLI_HOME, "data")
-    env["ARDUINO_DIRECTORIES_DOWNLOADS"] = os.path.join(CLI_HOME, "downloads")
-    env["ARDUINO_DIRECTORIES_USER"]      = os.path.join(CLI_HOME, "user")
-    env["ARDUINO_UPDATER_ENABLE_NOTIFICATION"] = "false"
-    env["ARDUINO_METRICS_ENABLED"] = "false"
-    for d in ("data", "downloads", "user"):
-        os.makedirs(os.path.join(CLI_HOME, d), exist_ok=True)
-    return env
+def dfu_path():
+    return _tool("dfu-util", "dfu-util")
 
 
-def run_stream(args, on_line=None, timeout=3600):
-    """Ejecuta arduino-cli entregando cada linea en cuanto aparece.
-    Devuelve (returncode, texto_completo)."""
-    exe = cli_path()
-    if not exe:
-        msg = "arduino-cli no esta instalado"
-        (on_line or _noop)(msg)
-        return 3, msg
-
-    if on_line:
-        on_line("$ arduino-cli " + " ".join(args))
-
-    p = subprocess.Popen([exe] + list(args), stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, env=cli_env(), text=True,
-                         encoding="utf-8", errors="replace", bufsize=1,
-                         **_no_window())
-    buf = []
-    try:
-        for line in p.stdout:
-            line = line.rstrip("\r\n")
-            buf.append(line)
-            if on_line and line.strip():
-                on_line(line)
-        p.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        p.kill()
-        return 124, "\n".join(buf) + "\n[timeout]"
-    return p.returncode, "\n".join(buf)
-
-
-def run_json(args, timeout=600):
-    exe = cli_path()
-    if not exe:
-        return 3, {}
-    try:
-        p = subprocess.run([exe] + list(args) + ["--format", "json"],
-                           capture_output=True, text=True, env=cli_env(),
-                           timeout=timeout, encoding="utf-8", errors="replace",
-                           **_no_window())
-        return p.returncode, (json.loads(p.stdout) if p.stdout.strip() else {})
-    except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
-        return 1, {}
+def avrdude_path():
+    return _tool("avrdude", "avrdude")
 
 
 # ---------------------------------------------------------------------------
-# Consultas
+# Puertos
 # ---------------------------------------------------------------------------
 def list_ports():
-    """[{port, label, vid, pid, fqbn}]. Usa arduino-cli; si no esta, pyserial."""
+    """[{port, label, vid, pid}] con pyserial (ya viene en el Python del repo)."""
     out = []
-    if cli_ready():
-        rc, d = run_json(["board", "list"])
-        if rc == 0 and d:
-            for item in d.get("detected_ports", d if isinstance(d, list) else []):
-                pt = item.get("port", {}) or {}
-                pr = pt.get("properties", {}) or {}
-                mb = item.get("matching_boards", []) or []
-                out.append({
-                    "port":  pt.get("address", ""),
-                    "label": pt.get("label", "") or (mb[0].get("name", "") if mb else ""),
-                    "vid":   (pr.get("vid", "") or "").replace("0x", "").upper(),
-                    "pid":   (pr.get("pid", "") or "").replace("0x", "").upper(),
-                    "fqbn":  mb[0].get("fqbn", "") if mb else "",
-                })
-    if not out:
-        try:
-            import serial.tools.list_ports as lp     # pyserial ya viene en el repo
-            for p in lp.comports():
-                out.append({"port": p.device, "label": p.description or "",
-                            "vid": ("%04X" % p.vid) if p.vid else "",
-                            "pid": ("%04X" % p.pid) if p.pid else "", "fqbn": ""})
-        except Exception:                            # noqa: BLE001
-            pass
+    try:
+        import serial.tools.list_ports as lp
+        for p in lp.comports():
+            out.append({"port": p.device, "label": p.description or "",
+                        "vid": ("%04X" % p.vid) if p.vid else "",
+                        "pid": ("%04X" % p.pid) if p.pid else ""})
+    except Exception:                                             # noqa: BLE001
+        pass
     return [p for p in out if p["port"]]
-
-
-def core_installed(board_key):
-    if not cli_ready():
-        return False
-    rc, d = run_json(["core", "list"])
-    if rc != 0 or not d:
-        return False
-    plats = d.get("platforms", d if isinstance(d, list) else [])
-    return any(p.get("id", "") == BOARDS[board_key]["core"] for p in plats)
-
-
-def libs_installed():
-    if not cli_ready():
-        return []
-    rc, d = run_json(["lib", "list"])
-    if rc != 0 or not d:
-        return []
-    items = d.get("installed_libraries", d if isinstance(d, list) else [])
-    return [i.get("library", {}).get("name", "") for i in items]
 
 
 def guess_port(board_key, ports=None):
     ports = ports if ports is not None else list_ports()
-    for p in ports:
-        if p["fqbn"].startswith("esp32:"):
-            return p["port"]
     for vid, pid in BOARDS[board_key]["vidpid"]:
         for p in ports:
             if p["vid"] == vid and (pid is None or p["pid"] == pid):
@@ -459,136 +229,190 @@ def guess_port(board_key, ports=None):
     return ports[0]["port"] if len(ports) == 1 else ""
 
 
-def status(board_key):
-    """Resumen para la pantalla de dependencias."""
-    libs = libs_installed()
-    return {
-        "cli":    cli_ready(),
-        "cli_sys": system_cli_path(),
-        "sketch": sketch_ok(),
-        "core":   core_installed(board_key),
-        "libs":   {l: (l in libs) for l in board_libs(board_key)},
-    }
-
-
-def all_ready(board_key):
-    st = status(board_key)
-    return st["cli"] and st["sketch"] and st["core"] and all(st["libs"].values())
-
-
 # ---------------------------------------------------------------------------
-# Operaciones
+# Cargar el binario
 # ---------------------------------------------------------------------------
-def install_deps(board_key, on_line=None, on_step=None):
-    """arduino-cli (si falta) + core + librerias. Devuelve (ok, mensaje)."""
+_PCT = re.compile(r"(\d+) ?%")
+
+
+def _run_proc(cmd, shown, on_line, on_step, timeout=300):
+    """Ejecuta una herramienta externa y entrega sus lineas. Las de progreso
+    ('Writing at 0x... (12 %)', 'Writing | ### | 12%', 'Download [==] 12%') se
+    resumen cada 10 %. Devuelve (rc, texto)."""
+    on_line("$ " + shown)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True, encoding="utf-8", errors="replace",
+                         bufsize=1, **_no_window())
+    buf, last = [], {}
+    try:
+        for ln in p.stdout:
+            ln = ln.rstrip("\r\n")
+            if not ln.strip():
+                continue
+            buf.append(ln)
+            m = _PCT.search(ln)
+            kind = ("Reading" if "Reading" in ln else
+                    "Writing" if "Writing" in ln else
+                    "Download" if "Download" in ln else "")
+            if m and kind:
+                pct = int(m.group(1))
+                if kind == "Reading":                 # avrdude verificando
+                    on_step(55 + int(pct * 0.35), "Verificando... %d %%" % pct)
+                else:
+                    span = 35 if "avrdude" in cmd[0].lower() else 70
+                    on_step(20 + int(pct * span / 100.0), "Cargando... %d %%" % pct)
+                if pct < last.get(kind, -10) + 10 and pct < 100:
+                    continue
+                last[kind] = pct
+            on_line(ln)
+        p.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        return 124, "\n".join(buf) + "\n[timeout]"
+    return p.returncode, "\n".join(buf)
+
+
+def upload_esptool(board_key, port, binf, on_line=None, on_step=None):
     line = on_line or _noop
     step = on_step or _noop
     spec = BOARDS[board_key]
 
-    ok, msg = install_cli(line, step)
-    if not ok:
-        return False, msg
-
-    step(18, "Configurando indices de Arduino...")
-    if spec["url"]:
-        run_stream(["config", "init", "--overwrite",
-                    "--additional-urls", spec["url"]], line, timeout=120)
-
-    step(22, "Actualizando indice de tarjetas...")
-    rc, _ = run_stream(["core", "update-index"], line, timeout=900)
-    if rc != 0:
-        return False, "No se pudo actualizar el indice. Revisa la conexion a internet."
-
-    if core_installed(board_key):
-        line("core %s ya esta instalado" % spec["core"])
-        step(70, "Core ya instalado")
-    else:
-        step(30, "Instalando core %s. Es ~1 GB, puede tardar varios minutos..." % spec["core"])
-        rc, _ = run_stream(["core", "install", spec["core"]], line, timeout=3600)
-        if rc != 0:
-            return False, "Fallo la instalacion del core %s" % spec["core"]
-
-    have = libs_installed()
-    blibs = board_libs(board_key)
-    for i, lib in enumerate(blibs):
-        step(75 + int(20 * i / len(blibs)), "Libreria %s..." % lib)
-        if lib in have:
-            line("%s ya esta instalada" % lib)
-            continue
-        rc, _ = run_stream(["lib", "install", lib], line, timeout=900)
-        if rc != 0:
-            return False, "Fallo la instalacion de la libreria %s" % lib
-
-    step(100, "Entorno listo")
-    return True, "Entorno listo para %s" % spec["label"]
-
-
-def compile_sketch(board_key, on_line=None, on_step=None):
-    """Compila firmware/firmware.ino. Devuelve (ok, mensaje, build_dir)."""
-    line = on_line or _noop
-    step = on_step or _noop
-    spec = BOARDS[board_key]
-    build = os.path.join(BUILD_ROOT, board_key)
-
-    if not sketch_ok():
-        return False, "No se encontro %s" % sketch_path(), build
-    os.makedirs(build, exist_ok=True)
-
-    args = ["compile", "--fqbn", spec["fqbn"], "--build-path", build]
-    if spec.get("flags"):
-        # activa la variante (-DLV_ESPNOW). compiler.cpp.extra_flags existe tanto
-        # en el core esp32 como en el avr, asi que sirve para todas.
-        args += ["--build-property", "compiler.cpp.extra_flags=" + spec["flags"]]
-    args.append(SKETCH_DIR)
-
-    step(12, "Compilando para %s..." % spec["label"])
-    rc, txt = run_stream(args, line, timeout=3600)
-    if rc != 0:
-        first = ""
-        for ln in txt.splitlines():
-            if "error:" in ln.lower():
-                first = ln.strip()
-                break
-        if not first:
-            tail = [l.strip() for l in txt.splitlines() if l.strip()]
-            first = tail[-1] if tail else "revisa el log"
-        if "not installed" in first.lower() or "3rd party" in first.lower():
-            first += "   ->   abre 'Instalar dependencias' primero"
-        return False, "Fallo la compilacion: " + first, build
-
-    step(60, "Compilacion terminada")
-    return True, "Compilado", build
-
-
-def upload_sketch(board_key, port, build=None, on_line=None, on_step=None):
-    """Carga el binario ya compilado. Devuelve (ok, mensaje)."""
-    line = on_line or _noop
-    step = on_step or _noop
-    spec = BOARDS[board_key]
-    build = build or os.path.join(BUILD_ROOT, board_key)
-
-    fqbn = spec["fqbn"]
-    if spec.get("speed"):
-        fqbn = "%s:UploadSpeed=%s" % (fqbn, spec["speed"])
-
-    step(70, "Cargando en %s..." % port)
-    rc, txt = run_stream(["upload", "-p", port, "--fqbn", fqbn,
-                          "--input-dir", build], line, timeout=900)
+    cmd = esptool_cmd()
+    if not cmd:
+        return False, "Falta Config\\flashtools\\esptool\\esptool.exe"
+    step(15, "Conectando con %s..." % port)
+    args = ["--chip", spec["chip"], "--port", port, "--baud", spec["baud"],
+            "--before", "default_reset", "--after", "hard_reset",
+            "write_flash", "-z", "0x0", binf]
+    rc, txt = _run_proc(cmd + args, "esptool " + " ".join(args), line, step)
     if rc != 0:
         blob = txt.lower()
         hint = ""
-        if "failed to connect" in blob or "no serial data" in blob:
+        if "failed to connect" in blob or "no serial data" in blob \
+                or "wrong boot mode" in blob:
             hint = " Manten presionado BOOT mientras inicia la carga."
         elif ("access is denied" in blob or "permission" in blob
-              or "cannot open" in blob or "busy" in blob):
+              or "could not open" in blob or "busy" in blob):
             hint = (" Cierra el monitor serie, el Arduino IDE o el VI que tenga "
                     "el puerto abierto.")
         return False, "Fallo la carga en %s.%s" % (port, hint)
-
     step(95, "Carga terminada")
     return True, "Firmware cargado en %s" % port
 
 
+def upload_avrdude(board_key, port, binf, on_line=None, on_step=None):
+    """UNO y Nano: el mismo comando que usa el IDE de Arduino."""
+    line = on_line or _noop
+    step = on_step or _noop
+    spec = BOARDS[board_key]
+
+    exe = avrdude_path()
+    if not exe:
+        return False, "Falta Config\\flashtools\\avrdude\\avrdude.exe"
+    conf = os.path.join(os.path.dirname(exe), "avrdude.conf")
+    args = []
+    if os.path.isfile(conf):
+        args += ["-C", conf]
+    args += ["-p", "atmega328p", "-c", "arduino", "-P", port,
+             "-b", str(spec["baud"]), "-D", "-U", "flash:w:%s:i" % binf]
+
+    step(15, "Hablando con el bootloader en %s..." % port)
+    rc, txt = _run_proc([exe] + args, "avrdude " + " ".join(args), line, step)
+    if rc != 0:
+        blob = txt.lower()
+        hint = ""
+        if "not in sync" in blob or "stk500" in blob:
+            hint = (" El bootloader no responde: revisa que elegiste la placa "
+                    "correcta (el Nano viejo usa 57600 baudios, el nuevo 115200).")
+        elif "can't open" in blob or "access" in blob or "denied" in blob:
+            hint = (" Cierra el monitor serie, el Arduino IDE o el VI que tenga "
+                    "el puerto abierto.")
+        return False, "Fallo la carga en %s.%s" % (port, hint)
+    step(95, "Carga terminada")
+    return True, "Firmware cargado en %s" % port
+
+
+def upload_dfu(board_key, port, binf, on_line=None, on_step=None):
+    """Arduino Nano ESP32: el bootloader de Arduino habla DFU (doble clic en
+    RESET). Es el mismo comando que usa el core de Arduino."""
+    line = on_line or _noop
+    step = on_step or _noop
+    spec = BOARDS[board_key]
+
+    exe = dfu_path()
+    if not exe:
+        return False, "Falta Config\\flashtools\\dfu-util\\dfu-util.exe"
+    step(15, "Buscando la placa en modo DFU...")
+    args = ["--device", "0x" + spec["dfu_id"].replace(":", ":0x"), "-D", binf, "-Q"]
+    rc, txt = _run_proc([exe] + args, "dfu-util " + " ".join(args), line, step, 180)
+    blob = txt.lower()
+    if rc != 0 and "downloaded successfully" not in blob \
+            and "download done" not in blob:
+        hint = ""
+        if "no dfu capable" in blob or "not found" in blob:
+            hint = (" Pon la placa en modo bootloader: doble clic rapido en "
+                    "RESET (LED verde fijo) y vuelve a intentar. Si Windows no "
+                    "la reconoce, falta el driver DFU (viene con el Arduino IDE).")
+        elif "cannot open" in blob or "access" in blob:
+            hint = " Cierra lo que tenga la placa abierta e intenta otra vez."
+        return False, "Fallo la carga por DFU.%s" % hint
+    step(95, "Carga terminada")
+    return True, "Firmware cargado por DFU"
+
+
+def find_node_drive():
+    """Letra/ruta de la unidad NODE_xxx que el ST-Link muestra, o ''."""
+    if IS_WIN:
+        import ctypes
+        buf = ctypes.create_unicode_buffer(261)
+        for letter in "DEFGHIJKLMNOPQRSTUVWXYZ":
+            root = letter + ":\\"
+            if not os.path.exists(root):
+                continue
+            ok = ctypes.windll.kernel32.GetVolumeInformationW(
+                root, buf, 261, None, None, None, None, 0)
+            if ok and buf.value.upper().startswith("NODE_"):
+                return root
+        return ""
+    for base in ("/media", "/run/media", "/Volumes", "/mnt"):
+        if not os.path.isdir(base):
+            continue
+        for root, dirs, _f in os.walk(base):
+            for d in dirs:
+                if d.upper().startswith("NODE_"):
+                    return os.path.join(root, d)
+            if root.count(os.sep) - base.count(os.sep) >= 2:
+                dirs[:] = []
+    return ""
+
+
+def upload_stlink_copy(board_key, port, binf, on_line=None, on_step=None):
+    import time
+    line = on_line or _noop
+    step = on_step or _noop
+
+    step(30, "Buscando la unidad NODE_xxx del ST-Link...")
+    drive = find_node_drive()
+    if not drive:
+        return False, ("No aparecio la unidad NODE_xxx del ST-Link: revisa el "
+                       "cable USB de la Nucleo (debe ser de datos).")
+    line("Unidad: %s" % drive)
+
+    step(50, "Copiando el binario...")
+    try:
+        shutil.copyfile(binf, os.path.join(drive, "firmware.bin"))
+    except OSError as e:                                          # noqa: BLE001
+        return False, "No se pudo copiar a %s (%s)." % (drive, e)
+
+    step(70, "El ST-Link esta grabando la placa...")
+    time.sleep(8.0)                       # el ST-Link graba y vuelve a montar la unidad
+    step(95, "Carga terminada")
+    return True, "Firmware copiado a %s" % drive
+
+
+# ---------------------------------------------------------------------------
+# Probar la tarjeta (tools/lv_probe.py)
+# ---------------------------------------------------------------------------
 def probe_script_path():
     return os.path.join(HERE, "lv_probe.py")
 
@@ -637,6 +461,25 @@ def run_probe(port, on_line=None, on_step=None, peer_port=None,
     return ok, ("Todo paso" if ok else "Algo fallo -- revisa el log de arriba")
 
 
+def wait_port(vidpid, prefer=None, timeout=12.0):
+    """Espera a que aparezca un puerto con alguno de esos VID/PID y lo devuelve
+    (o "" si no sale). Si 'prefer' sigue en la lista y coincide, gana."""
+    import time
+    t0 = time.time()
+    while True:
+        found = []
+        for p in list_ports():
+            for vid, pid in vidpid:
+                if p["vid"] == vid and (pid is None or p["pid"] == pid):
+                    found.append(p["port"])
+                    break
+        if found:
+            return prefer if prefer in found else found[0]
+        if time.time() - t0 >= timeout:
+            return ""
+        time.sleep(1.0)
+
+
 def ping_board(port, wait_reset=2.0):
     """Protocolo v2: manda 0xF0 y espera 'AA'. Devuelve (ok|None, detalle)."""
     try:
@@ -655,27 +498,45 @@ def ping_board(port, wait_reset=2.0):
         return False, str(e)
 
 
-def flash_all(board_key, port, on_line=None, on_step=None, verify=True):
-    """compilar -> cargar -> verificar. Devuelve (ok, mensaje)."""
+# ---------------------------------------------------------------------------
+# Cargar + verificar
+# ---------------------------------------------------------------------------
+def flash_all(board_key, port, on_line=None, on_step=None, verify=True,
+              bin_file=None):
+    """cargar el binario -> verificar con PING. 'bin_file' reemplaza al archivo
+    por defecto de firmware/bin. Devuelve (ok, mensaje)."""
     line = on_line or _noop
     step = on_step or _noop
+    spec = BOARDS[board_key]
+    method = spec["method"]
+    binf = bin_file or bin_path(board_key)
 
-    if not cli_ready():
-        return False, "Falta arduino-cli. Abre 'Instalar dependencias' primero."
-    if not core_installed(board_key):
-        return False, ("Falta el core %s. Abre 'Instalar dependencias' primero."
-                       % BOARDS[board_key]["core"])
+    if spec.get("needs_port", True) and not port:
+        return False, "Selecciona un puerto."
+    if not os.path.isfile(binf):
+        return False, ("No existe el archivo %s. Compilalo siguiendo "
+                       "firmware\\COMPILAR.md." % binf)
 
-    ok, msg, build = compile_sketch(board_key, line, step)
-    if not ok:
-        return False, msg
-
-    ok, msg = upload_sketch(board_key, port, build, line, step)
+    uploader = {"esptool": upload_esptool, "dfu": upload_dfu,
+                "avrdude": upload_avrdude, "stlink_copy": upload_stlink_copy}[method]
+    step(5, "Preparando %s..." % os.path.basename(binf))
+    line("Archivo: %s" % binf)
+    ok, msg = uploader(board_key, port, binf, line, step)
     if not ok:
         return False, msg
 
     if verify:
         step(98, "Verificando la tarjeta...")
+        if spec.get("post_vidpid"):
+            # El puerto del firmware puede ser NUEVO (VCP del ST-Link, USB nativo
+            # del Nano ESP32): se busca por VID/PID en vez de confiar en el que
+            # habia antes.
+            line("Buscando el puerto del firmware...")
+            port = wait_port(spec["post_vidpid"], prefer=port)
+            if not port:
+                return True, ("Firmware cargado, pero no apareció el puerto "
+                              "serie de la placa. Reconecta el USB y revisa "
+                              "el Administrador de dispositivos.")
         alive, detail = ping_board(port)
         if alive is None:
             line("(sin verificar: %s)" % detail)
@@ -686,4 +547,184 @@ def flash_all(board_key, port, on_line=None, on_step=None, verify=True):
                            "PING (%s). Desconecta y reconecta el USB." % detail)
 
     step(100, "Listo")
-    return True, "Firmware cargado correctamente en %s" % port
+    return True, ("Firmware cargado correctamente en %s" % port) if port \
+        else "Firmware cargado correctamente"
+
+
+# ---------------------------------------------------------------------------
+# Variante ONLINE (WiFi + FTP con SD por SPI): comandos 0xC1..0xC6
+#
+# Se habla con el MISMO protocolo binario que LabVIEW, asi que el puerto solo
+# puede tenerlo abierto UNA aplicacion a la vez (esta ventana o un VI).
+# La sesion se mantiene abierta entre operaciones a proposito: el ESP32 se
+# reinicia al abrir el puerto, y al reiniciarse pierde la conexion WiFi.
+# ---------------------------------------------------------------------------
+WIFI_TXT = {0: "apagado", 1: "conectando...", 2: "conectado",
+            3: "fallo (red no encontrada o clave incorrecta)"}
+FTP_TXT  = {0: "apagado", 1: "activo", 2: "error de SD (¿esta puesta y cableada?)"}
+
+
+class LvLink(object):
+    """Sesion serie con la tarjeta. Solo para operaciones de configuracion."""
+
+    def __init__(self, port, wait_reset=2.0):
+        import serial
+        import time
+        self.port = port
+        self.s = serial.Serial(port, 115200, timeout=2.0)
+        time.sleep(wait_reset)                 # el ESP32 se reinicia al abrir
+        self.s.reset_input_buffer()
+
+    def close(self):
+        try:
+            self.s.close()
+        except Exception:                                         # noqa: BLE001
+            pass
+
+    # --- bajo nivel ---------------------------------------------------------
+    def _ack(self, payload):
+        self.s.reset_input_buffer()
+        self.s.write(bytes(payload))
+        return self.s.read(2) == b"AA"
+
+    @staticmethod
+    def _two(cmd, a, b):
+        a, b = a.encode("utf-8"), b.encode("utf-8")
+        return bytes([cmd, len(a), len(b)]) + a + b
+
+    # --- comandos -----------------------------------------------------------
+    def identity(self):
+        """'LV,<variante>,<version>,<mac>' o '' si no responde."""
+        self.s.reset_input_buffer()
+        self.s.write(bytes([0xEF]))
+        return self.s.readline().decode("ascii", "replace").strip()
+
+    def is_online(self):
+        ident = self.identity()
+        return ident.startswith("LV,") and ident.split(",")[1].endswith("-ONLINE"), ident
+
+    def wifi_save(self, ssid, pw):
+        if not (1 <= len(ssid.encode("utf-8")) <= 32 and len(pw.encode("utf-8")) <= 63):
+            return False
+        return self._ack(self._two(0xC1, ssid, pw))
+
+    def wifi_connect(self):
+        return self._ack([0xC2])
+
+    def wifi_disconnect(self):
+        return self._ack([0xC4])
+
+    def ftp_save(self, user, pw):
+        if not (1 <= len(user.encode("utf-8")) <= 32 and 1 <= len(pw.encode("utf-8")) <= 32):
+            return False
+        return self._ack(self._two(0xC5, user, pw))
+
+    def ftp_set(self, on):
+        return self._ack([0xC6, 1 if on else 0])
+
+    def status(self):
+        """dict(wifi, ip, rssi, ftp, sd_mb) o None si la respuesta no es valida."""
+        self.s.reset_input_buffer()
+        self.s.write(bytes([0xC3]))
+        parts = self.s.readline().decode("ascii", "replace").strip().split(",")
+        if len(parts) != 5:
+            return None
+        try:
+            return {"wifi": int(parts[0]), "ip": parts[1], "rssi": int(parts[2]),
+                    "ftp": int(parts[3]), "sd_mb": int(parts[4])}
+        except ValueError:
+            return None
+
+
+def _fmt_status(st):
+    if st is None:
+        return "Sin respuesta valida a 0xC3 (¿firmware ONLINE cargado?)"
+    txt = "WiFi: %s" % WIFI_TXT.get(st["wifi"], st["wifi"])
+    if st["wifi"] == 2:
+        txt += "  IP %s  (%d dBm)" % (st["ip"], st["rssi"])
+    txt += "   |   FTP: %s" % FTP_TXT.get(st["ftp"], st["ftp"])
+    if st["ftp"] == 1:
+        txt += "  (SD %d MB)" % st["sd_mb"]
+    return txt
+
+
+def online_check(link, on_line=None):
+    """Verifica que la tarjeta sea la variante ONLINE. Devuelve (ok, mensaje)."""
+    line = on_line or _noop
+    ok, ident = link.is_online()
+    line("Identidad: %s" % (ident or "(sin respuesta)"))
+    if not ident:
+        return False, "La tarjeta no responde. ¿Puerto correcto? ¿Hay un VI con el puerto abierto?"
+    if not ok:
+        return False, ("Este firmware no es la variante ONLINE. Carga una tarjeta "
+                       "'... + WiFi/FTP' desde 'Cargar firmware'.")
+    return True, "Variante ONLINE detectada"
+
+
+def online_connect(link, ssid, pw, on_line=None, on_step=None, timeout=25):
+    """Guarda SSID/clave, conecta y espera la IP. Devuelve (ok, mensaje)."""
+    import time
+    line = on_line or _noop
+    step = on_step or _noop
+    ok, msg = online_check(link, line)
+    if not ok:
+        return False, msg
+    if not link.wifi_save(ssid, pw):
+        return False, "La tarjeta rechazo el SSID/clave (SSID: 1 a 32 caracteres, clave: 0 a 63)."
+    if not link.wifi_connect():
+        return False, "La tarjeta no pudo iniciar la conexion."
+
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        st = link.status()
+        line(_fmt_status(st))
+        if st and st["wifi"] == 2:
+            step(100, "")
+            return True, "Conectado a '%s'. IP: %s" % (ssid, st["ip"])
+        if st and st["wifi"] == 3:
+            return False, "No se pudo conectar a '%s': revisa el nombre y la clave." % ssid
+        step(min(95, int(100 * (time.time() - t0) / timeout)), "Conectando a %s..." % ssid)
+        time.sleep(1.0)
+    return False, "La red '%s' no respondio a tiempo." % ssid
+
+
+def online_ftp_start(link, user, pw, on_line=None):
+    """Guarda usuario/clave, monta la SD y arranca el FTP. (ok, mensaje)"""
+    line = on_line or _noop
+    ok, msg = online_check(link, line)
+    if not ok:
+        return False, msg
+    if not link.ftp_save(user, pw):
+        return False, "Usuario y clave del FTP: de 1 a 32 caracteres cada uno."
+    if not link.ftp_set(True):
+        st = link.status()
+        line(_fmt_status(st))
+        if st and st["wifi"] != 2:
+            return False, "No hay WiFi conectado: conecta primero."
+        if st and st["ftp"] == 2:
+            return False, FTP_TXT[2]
+        return False, "La tarjeta no pudo iniciar el FTP."
+    st = link.status()
+    line(_fmt_status(st))
+    if st and st["ftp"] == 1:
+        return True, ("FTP activo:  ftp://%s@%s/   (SD %d MB). En el Explorador "
+                      "de Windows escribe esa direccion." % (user, st["ip"], st["sd_mb"]))
+    return True, "FTP activo"
+
+
+def online_ftp_stop(link, on_line=None):
+    ok = link.ftp_set(False)
+    return ok, "FTP detenido (SD liberada)" if ok else "La tarjeta no respondio"
+
+
+def online_disconnect(link, on_line=None):
+    ok = link.wifi_disconnect()
+    return ok, "WiFi desconectado (radio apagado, ADC2 disponible)" if ok else "La tarjeta no respondio"
+
+
+def online_status(link, on_line=None):
+    ok, msg = online_check(link, on_line)
+    if not ok:
+        return False, msg
+    st = link.status()
+    return st is not None, _fmt_status(st)

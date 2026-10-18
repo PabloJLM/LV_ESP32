@@ -1,0 +1,3 @@
+dfu-util 0.11.0-arduino5 (build de Arduino)
+Proyecto: https://dfu-util.sourceforge.net/  Licencia: GPL-2.0
+Se usa para cargar el firmware del Arduino Nano ESP32 por DFU.

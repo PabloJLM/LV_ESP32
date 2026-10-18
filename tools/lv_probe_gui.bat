@@ -2,7 +2,7 @@
 REM ===========================================================================
 REM  lv_probe_gui.bat — LV_ESP32
 REM  GUI aparte, solo para "Probar tarjeta". No comparte ventana con
-REM  lv_gui.bat (que es Instalar dependencias + Cargar firmware).
+REM  lv_gui.bat (que es Cargar firmware + WiFi y FTP).
 REM
 REM  Desde LabVIEW (System Exec.vi, "wait until completion" = FALSE):
 REM     "<repo>\tools\lv_probe_gui.bat"                selecciona el puerto en la GUI

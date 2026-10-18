@@ -2,12 +2,14 @@
 REM ===========================================================================
 REM  lv_gui.bat — LV_ESP32
 REM  Punto de entrada unico. Se arregla solo sobre un clon limpio del repo:
-REM  si falta PyQt5 lo instala en el Python embebido del propio repositorio.
+REM  si falta PyQt5 lo instala en el Python embebido del propio repositorio
+REM  (una sola vez, necesita internet). El flasheo usa las herramientas nativas
+REM  de Config\flashtools (esptool.exe, avrdude.exe, dfu-util.exe).
 REM
-REM  Desde LabVIEW (System Exec.vi, "wait until completion" = FALSE):
+REM  Desde LabVIEW (System Exec.vi, "wait until completion" = TRUE):
 REM     "<repo>\tools\lv_gui.bat"                 lanzador con las 2 herramientas
 REM     "<repo>\tools\lv_gui.bat" --tool flash    solo "Cargar firmware"
-REM     "<repo>\tools\lv_gui.bat" --tool deps     solo "Instalar dependencias"
+REM     "<repo>\tools\lv_gui.bat" --tool online   solo "WiFi y FTP"
 REM ===========================================================================
 setlocal
 set "TOOLS=%~dp0"

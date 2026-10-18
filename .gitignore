@@ -4,19 +4,46 @@
 #  publica en GitHub Releases, no aqui.
 # ===========================================================================
 
-# arduino-cli portable y el core de Arduino (~1 GB): van en el ZIP, no en Git
+# arduino-cli y el core de Arduino (~1 GB): ya no son parte del producto. Si los
+# usas para compilar los binarios, que se queden en tu PC y fuera de Git
 Config/arduino-cli/
 
-# PyQt5 instalado dentro del Python embebido (~60 MB): idem
-Config/python/Lib/site-packages/PyQt5/
-Config/python/Lib/site-packages/PyQt5_Qt5/
-Config/python/Lib/site-packages/PyQt5_sip*
-Config/python/Lib/site-packages/PyQt5-*
-Config/python/Lib/site-packages/PySide6*
-Config/python/Lib/site-packages/shiboken6*
+# Paquetes que instala lv_gui.bat dentro del Python embebido (PyQt5, esptool y
+# sus dependencias): no van en Git. Solo se conservan pip, setuptools, wheel,
+# packaging y pyserial, que son pequenos.
+Config/python/Lib/site-packages/*
+!Config/python/Lib/site-packages/pip/
+!Config/python/Lib/site-packages/pip-*/
+!Config/python/Lib/site-packages/pkg_resources/
+!Config/python/Lib/site-packages/setuptools/
+!Config/python/Lib/site-packages/setuptools-*/
+!Config/python/Lib/site-packages/_distutils_hack/
+!Config/python/Lib/site-packages/distutils-precedence.pth
+!Config/python/Lib/site-packages/wheel/
+!Config/python/Lib/site-packages/wheel-*/
+!Config/python/Lib/site-packages/packaging/
+!Config/python/Lib/site-packages/packaging-*/
+!Config/python/Lib/site-packages/serial/
+!Config/python/Lib/site-packages/pyserial-*/
+Config/python/Scripts/*
+!Config/python/Scripts/pip*.exe
+!Config/python/Scripts/wheel.exe
+!Config/python/Scripts/pyserial-*.exe
 
 # paquetes generados
 dist/
+
+# PlatformIO: compilaciones locales
+.pio/
+
+# Herramientas nativas de carga y binarios compilados: no van en Git. Van dentro
+# de dist\LV_Firmware\ y del ZIP (ver Config/flashtools/LEEME.md y
+# firmware/COMPILAR.md)
+Config/flashtools/**/*.exe
+Config/flashtools/**/*.dll
+Config/flashtools/**/*.conf
+firmware/bin/*
+!firmware/bin/.gitkeep
 
 # compilaciones del firmware
 firmware/build/
