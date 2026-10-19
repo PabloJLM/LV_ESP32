@@ -232,39 +232,58 @@ def guess_port(board_key, ports=None):
 # ---------------------------------------------------------------------------
 # Cargar el binario
 # ---------------------------------------------------------------------------
-_PCT = re.compile(r"(\d+) ?%")
+_PCT = re.compile(r"(\d+(?:\.\d+)?) ?%")
 
 
 def _run_proc(cmd, shown, on_line, on_step, timeout=300):
-    """Ejecuta una herramienta externa y entrega sus lineas. Las de progreso
-    ('Writing at 0x... (12 %)', 'Writing | ### | 12%', 'Download [==] 12%') se
-    resumen cada 10 %. Devuelve (rc, texto)."""
+    """Ejecuta una herramienta externa y entrega su salida tal cual la veria una
+    terminal: lo que termina en '\\r' es una barra de progreso que se REESCRIBE
+    (on_line recibe el texto con un '\\r' al inicio para reemplazar la ultima
+    linea). Devuelve (rc, texto)."""
     on_line("$ " + shown)
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                         text=True, encoding="utf-8", errors="replace",
-                         bufsize=1, **_no_window())
-    buf, last = [], {}
+                         bufsize=0, **_no_window())
+    buf = []
+    st = {"cur": "", "replace": False}
+
+    def emit(text):
+        buf.append(text)
+        m = _PCT.search(text)
+        kind = ("Reading" if "Reading" in text else
+                "Writing" if "Writing" in text else
+                "Download" if "Download" in text else "")
+        if m and kind:
+            pct = min(100, int(float(m.group(1))))
+            if kind == "Reading":                     # avrdude verificando
+                on_step(55 + int(pct * 0.35), "Verificando... %d %%" % pct)
+            else:
+                span = 35 if "avrdude" in cmd[0].lower() else 70
+                on_step(20 + int(pct * span / 100.0), "Cargando... %d %%" % pct)
+        on_line(("\r" if st["replace"] else "") + text)
+
+    def flush(cr):
+        text = st["cur"]
+        st["cur"] = ""
+        if not text.strip():
+            if not cr:                                 # '\r\n' o linea vacia
+                st["replace"] = False
+            return
+        emit(text)
+        st["replace"] = cr
+
     try:
-        for ln in p.stdout:
-            ln = ln.rstrip("\r\n")
-            if not ln.strip():
-                continue
-            buf.append(ln)
-            m = _PCT.search(ln)
-            kind = ("Reading" if "Reading" in ln else
-                    "Writing" if "Writing" in ln else
-                    "Download" if "Download" in ln else "")
-            if m and kind:
-                pct = int(m.group(1))
-                if kind == "Reading":                 # avrdude verificando
-                    on_step(55 + int(pct * 0.35), "Verificando... %d %%" % pct)
+        while True:
+            data = p.stdout.read(4096)
+            if not data:
+                break
+            for ch in data.decode("utf-8", "replace"):
+                if ch == "\r":
+                    flush(True)
+                elif ch == "\n":
+                    flush(False)
                 else:
-                    span = 35 if "avrdude" in cmd[0].lower() else 70
-                    on_step(20 + int(pct * span / 100.0), "Cargando... %d %%" % pct)
-                if pct < last.get(kind, -10) + 10 and pct < 100:
-                    continue
-                last[kind] = pct
-            on_line(ln)
+                    st["cur"] += ch
+        flush(False)
         p.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         p.kill()
@@ -282,8 +301,8 @@ def upload_esptool(board_key, port, binf, on_line=None, on_step=None):
         return False, "Falta Config\\flashtools\\esptool\\esptool.exe"
     step(15, "Conectando con %s..." % port)
     args = ["--chip", spec["chip"], "--port", port, "--baud", spec["baud"],
-            "--before", "default_reset", "--after", "hard_reset",
-            "write_flash", "-z", "0x0", binf]
+            "--before", "default-reset", "--after", "hard-reset",
+            "write-flash", "-z", "0x0", binf]
     rc, txt = _run_proc(cmd + args, "esptool " + " ".join(args), line, step)
     if rc != 0:
         blob = txt.lower()

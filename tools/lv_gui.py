@@ -28,7 +28,7 @@ import lv_core as core                                            # noqa: E402
 # ---------------------------------------------------------------------------
 try:
     from PyQt5.QtCore import Qt, QThread, pyqtSignal as SignalT
-    from PyQt5.QtGui import QFont
+    from PyQt5.QtGui import QFont, QTextCursor
     from PyQt5.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame,
                                  QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                  QPlainTextEdit, QProgressBar, QPushButton,
@@ -37,7 +37,7 @@ try:
 except ImportError:
     try:
         from PySide6.QtCore import Qt, QThread, Signal as SignalT
-        from PySide6.QtGui import QFont
+        from PySide6.QtGui import QFont, QTextCursor
         from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame,
                                        QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                        QPlainTextEdit, QProgressBar, QPushButton,
@@ -162,7 +162,15 @@ class ToolWindow(QWidget):
         self.form.setColumnStretch(1, 1)
 
     def append(self, txt):
-        self.log.appendPlainText(txt)
+        # Un texto que empieza con "\r" reemplaza la ultima linea (barras de
+        # progreso, como en una terminal real).
+        if txt.startswith("\r"):
+            c = self.log.textCursor()
+            c.movePosition(QTextCursor.End)
+            c.select(QTextCursor.LineUnderCursor)
+            c.insertText(txt[1:])
+        else:
+            self.log.appendPlainText(txt)
         self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum())
 
     def on_step(self, pct, msg):
