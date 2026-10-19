@@ -11,7 +11,8 @@ WiFi/FTP.
     lv_gui.py --tool flash --port COM5 --board esp32_wrover
 
 Desde LabVIEW (System Exec.vi, "wait until completion" = FALSE):
-    "<repo>\\Config\\python\\pythonw.exe" "<repo>\\tools\\lv_gui.py" --tool flash
+    Windows:  "<repo>\\tools\\lv_gui.bat" --tool flash
+    Linux:    "<repo>/tools/lv_gui.sh" --tool flash
 
 Funciona con PyQt5 o con PySide6, el que este instalado.
 """
@@ -46,7 +47,7 @@ except ImportError:
     except ImportError:
         sys.stderr.write(
             "\nFalta la libreria grafica. Instalala en el Python portable:\n\n"
-            "    Config\\python\\python.exe -m pip install PyQt5\n\n")
+            "    %s -m pip install PyQt5\n\n" % sys.executable)
         sys.exit(3)
 
 
@@ -239,7 +240,7 @@ class FlashWindow(ToolWindow):
         self.btn_file.clicked.connect(self.pick_file)
         self.cb_board.currentIndexChanged.connect(lambda _i: self._on_board())
         self.ed_file.textChanged.connect(lambda _t: self._apply_board())
-        self.ed_file.setText(core.bin_path(self.board()))
+        self.ed_file.setText(core.display_path(core.bin_path(self.board())))
         self.rescan(preferred=port)
 
     def board(self):
@@ -250,27 +251,28 @@ class FlashWindow(ToolWindow):
         return core.BOARDS[self.board()].get("needs_port", True)
 
     def _file_ok(self):
-        return os.path.isfile(self.ed_file.text().strip())
+        return os.path.isfile(core.resolve_path(self.ed_file.text()))
 
     def _on_board(self):
         # al cambiar de placa se propone el binario de esa placa
-        self.ed_file.setText(core.bin_path(self.board()))
+        self.ed_file.setText(core.display_path(core.bin_path(self.board())))
         self._apply_board()
 
     def pick_file(self):
-        start = self.ed_file.text().strip() or core.BIN_DIR
+        start = core.resolve_path(self.ed_file.text()) or core.BIN_DIR
         path, _flt = QFileDialog.getOpenFileName(
             self, "Elegir el archivo de firmware", start,
             "Firmware (*.bin *.hex);;Todos los archivos (*)")
         if path:
-            self.ed_file.setText(os.path.normpath(path))
+            self.ed_file.setText(core.display_path(os.path.normpath(path)))
 
     def _apply_board(self):
         has = bool(self.cb_port.currentData())
         self.btn_go.setEnabled(has or not self._needs_port())
         if not self._file_ok():
             self.set_status("No existe el archivo de firmware. Usa Examinar... "
-                            "o compilalo (firmware\\COMPILAR.md).", "err")
+                            "o compilalo (%s)." % os.path.join("firmware", "COMPILAR.md"),
+                            "err")
         elif core.BOARDS[self.board()].get("note"):
             self.set_status(core.BOARDS[self.board()]["note"], "info")
         elif not self._needs_port():

@@ -7,9 +7,9 @@ El repositorio NO compila nada: los binarios ya vienen hechos en firmware/bin/
 (un archivo por tarjeta, ver firmware/COMPILAR.md). Aqui solo se cargan, cada
 tarjeta con su herramienta nativa, que va portable en Config/flashtools/:
 
-    ESP32 Wrover (USB y USB + WiFi/FTP)   esptool.exe
-    Arduino Nano ESP32                    dfu-util.exe
-    Arduino UNO / Nano                    avrdude.exe + avrdude.conf
+    ESP32 Wrover (USB y USB + WiFi/FTP)   esptool   (.exe en Windows)
+    Arduino Nano ESP32                    dfu-util
+    Arduino UNO / Nano                    avrdude + avrdude.conf
     Nucleo F303K8 (K8)                    sin herramienta: se copia el .bin a la
                                           unidad NODE_F303K8 del ST-Link
 
@@ -17,6 +17,11 @@ tarjeta con su herramienta nativa, que va portable en Config/flashtools/:
       LV_Firmware.exe  (o tools/lv_gui.py en desarrollo)
       Config/flashtools/{esptool,dfu-util,avrdude}/
       firmware/bin/*.bin|*.hex
+
+Funciona en Windows y Linux (macOS). Las herramientas se buscan primero en
+Config/flashtools/ y, si no estan, en el PATH del sistema. Todas las rutas se
+calculan desde la ubicacion del proyecto, asi que la carpeta puede estar en
+cualquier lado y en cualquier PC.
 
 Nada se instala en %LOCALAPPDATA% ni en el perfil del usuario.
 Solo stdlib (esptool y pyserial se usan como paquetes de Python).
@@ -168,15 +173,59 @@ def bin_path(board_key):
     return os.path.join(BIN_DIR, BOARDS[board_key]["bin"])
 
 
+def display_path(p):
+    """Ruta para MOSTRAR: relativa a la raiz del proyecto si el archivo esta
+    dentro de el (asi no aparece la ruta de esta PC); si no, tal cual."""
+    if not p:
+        return p
+    try:
+        rel = os.path.relpath(p, REPO)
+    except ValueError:                       # otra unidad en Windows
+        return p
+    return p if rel.split(os.sep)[0] == os.pardir else rel
+
+
+def resolve_path(p):
+    """Inversa de display_path: una ruta relativa se resuelve contra la raiz
+    del proyecto (no contra el directorio de trabajo). '' -> ''."""
+    p = os.path.expanduser((p or "").strip())
+    if not p:
+        return ""
+    return os.path.normpath(p if os.path.isabs(p) else os.path.join(REPO, p))
+
+
+def _shown(args, binf):
+    """Linea de comando para el log, con el binario en ruta relativa."""
+    return " ".join(args).replace(binf, display_path(binf))
+
+
+def _missing_tool(folder, exe):
+    rel = os.path.join("Config", "flashtools", folder,
+                       exe + (".exe" if IS_WIN else ""))
+    msg = "Falta %s" % rel
+    if not IS_WIN:
+        msg += " (o instalalo en el sistema: sudo apt install %s)" % folder
+    return msg
+
+
+# En Linux el puerto serie pertenece al grupo dialout (o uucp en Arch)
+_PERM_HINT = ("" if IS_WIN else
+              " En Linux tu usuario debe estar en el grupo dialout: "
+              "sudo usermod -aG dialout $USER  (y volver a iniciar sesion).")
+
+
 def bin_ok(board_key):
     return os.path.isfile(bin_path(board_key))
 
 
 def _tool(folder, exe):
-    """Ruta de una herramienta nativa portable, o None si no esta."""
+    """Ruta de una herramienta nativa: la portable de Config/flashtools si
+    esta; si no, la instalada en el sistema (PATH). None si no hay ninguna."""
     name = exe + (".exe" if IS_WIN else "")
     p = os.path.join(FLASHTOOLS_DIR, folder, name)
-    return p if os.path.isfile(p) else None
+    if os.path.isfile(p):
+        return p
+    return shutil.which(exe)
 
 
 def esptool_cmd():
@@ -298,12 +347,12 @@ def upload_esptool(board_key, port, binf, on_line=None, on_step=None):
 
     cmd = esptool_cmd()
     if not cmd:
-        return False, "Falta Config\\flashtools\\esptool\\esptool.exe"
+        return False, _missing_tool("esptool", "esptool")
     step(15, "Conectando con %s..." % port)
     args = ["--chip", spec["chip"], "--port", port, "--baud", spec["baud"],
             "--before", "default-reset", "--after", "hard-reset",
             "write-flash", "-z", "0x0", binf]
-    rc, txt = _run_proc(cmd + args, "esptool " + " ".join(args), line, step)
+    rc, txt = _run_proc(cmd + args, "esptool " + _shown(args, binf), line, step)
     if rc != 0:
         blob = txt.lower()
         hint = ""
@@ -313,7 +362,7 @@ def upload_esptool(board_key, port, binf, on_line=None, on_step=None):
         elif ("access is denied" in blob or "permission" in blob
               or "could not open" in blob or "busy" in blob):
             hint = (" Cierra el monitor serie, el Arduino IDE o el VI que tenga "
-                    "el puerto abierto.")
+                    "el puerto abierto.") + _PERM_HINT
         return False, "Fallo la carga en %s.%s" % (port, hint)
     step(95, "Carga terminada")
     return True, "Firmware cargado en %s" % port
@@ -327,7 +376,7 @@ def upload_avrdude(board_key, port, binf, on_line=None, on_step=None):
 
     exe = avrdude_path()
     if not exe:
-        return False, "Falta Config\\flashtools\\avrdude\\avrdude.exe"
+        return False, _missing_tool("avrdude", "avrdude")
     conf = os.path.join(os.path.dirname(exe), "avrdude.conf")
     args = []
     if os.path.isfile(conf):
@@ -336,7 +385,7 @@ def upload_avrdude(board_key, port, binf, on_line=None, on_step=None):
              "-b", str(spec["baud"]), "-D", "-U", "flash:w:%s:i" % binf]
 
     step(15, "Hablando con el bootloader en %s..." % port)
-    rc, txt = _run_proc([exe] + args, "avrdude " + " ".join(args), line, step)
+    rc, txt = _run_proc([exe] + args, "avrdude " + _shown(args, binf), line, step)
     if rc != 0:
         blob = txt.lower()
         hint = ""
@@ -345,7 +394,7 @@ def upload_avrdude(board_key, port, binf, on_line=None, on_step=None):
                     "correcta (el Nano viejo usa 57600 baudios, el nuevo 115200).")
         elif "can't open" in blob or "access" in blob or "denied" in blob:
             hint = (" Cierra el monitor serie, el Arduino IDE o el VI que tenga "
-                    "el puerto abierto.")
+                    "el puerto abierto.") + _PERM_HINT
         return False, "Fallo la carga en %s.%s" % (port, hint)
     step(95, "Carga terminada")
     return True, "Firmware cargado en %s" % port
@@ -360,18 +409,21 @@ def upload_dfu(board_key, port, binf, on_line=None, on_step=None):
 
     exe = dfu_path()
     if not exe:
-        return False, "Falta Config\\flashtools\\dfu-util\\dfu-util.exe"
+        return False, _missing_tool("dfu-util", "dfu-util")
     step(15, "Buscando la placa en modo DFU...")
     args = ["--device", "0x" + spec["dfu_id"].replace(":", ":0x"), "-D", binf, "-Q"]
-    rc, txt = _run_proc([exe] + args, "dfu-util " + " ".join(args), line, step, 180)
+    rc, txt = _run_proc([exe] + args, "dfu-util " + _shown(args, binf), line, step, 180)
     blob = txt.lower()
     if rc != 0 and "downloaded successfully" not in blob \
             and "download done" not in blob:
         hint = ""
         if "no dfu capable" in blob or "not found" in blob:
             hint = (" Pon la placa en modo bootloader: doble clic rapido en "
-                    "RESET (LED verde fijo) y vuelve a intentar. Si Windows no "
-                    "la reconoce, falta el driver DFU (viene con el Arduino IDE).")
+                    "RESET (LED verde fijo) y vuelve a intentar. " +
+                    ("Si Windows no la reconoce, falta el driver DFU (viene con "
+                     "el Arduino IDE)." if IS_WIN else
+                     "En Linux hace falta una regla udev para 2341:0070 o correr "
+                     "con permisos (sudo)."))
         elif "cannot open" in blob or "access" in blob:
             hint = " Cierra lo que tenga la placa abierta e intenta otra vez."
         return False, "Fallo la carga por DFU.%s" % hint
@@ -528,18 +580,18 @@ def flash_all(board_key, port, on_line=None, on_step=None, verify=True,
     step = on_step or _noop
     spec = BOARDS[board_key]
     method = spec["method"]
-    binf = bin_file or bin_path(board_key)
+    binf = resolve_path(bin_file) if bin_file else bin_path(board_key)
 
     if spec.get("needs_port", True) and not port:
         return False, "Selecciona un puerto."
     if not os.path.isfile(binf):
-        return False, ("No existe el archivo %s. Compilalo siguiendo "
-                       "firmware\\COMPILAR.md." % binf)
+        return False, ("No existe el archivo %s. Compilalo siguiendo %s."
+                       % (display_path(binf), os.path.join("firmware", "COMPILAR.md")))
 
     uploader = {"esptool": upload_esptool, "dfu": upload_dfu,
                 "avrdude": upload_avrdude, "stlink_copy": upload_stlink_copy}[method]
     step(5, "Preparando %s..." % os.path.basename(binf))
-    line("Archivo: %s" % binf)
+    line("Archivo: %s" % display_path(binf))
     ok, msg = uploader(board_key, port, binf, line, step)
     if not ok:
         return False, msg
