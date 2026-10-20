@@ -1,15 +1,4 @@
 #!/usr/bin/env sh
-# ===========================================================================
-#  lv_gui.sh - LV_ESP32  (equivalente en Linux/macOS de lv_gui.bat)
-#  Funciona desde cualquier carpeta: todo se calcula desde la ubicacion del
-#  script. La primera vez crea un entorno virtual en <repo>/.venv e instala
-#  PyQt5, pyserial y esptool (necesita internet, una sola vez).
-#  dfu-util y avrdude se instalan con el sistema: sudo apt install dfu-util avrdude
-#
-#     tools/lv_gui.sh                 lanzador
-#     tools/lv_gui.sh --tool flash    solo "Cargar firmware"
-#     tools/lv_gui.sh --tool online   solo "WiFi y FTP"
-# ===========================================================================
 TOOLS="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(dirname "$TOOLS")"
 VENV="$REPO/.venv"

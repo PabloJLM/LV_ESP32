@@ -1,37 +1,20 @@
-# -*- coding: utf-8 -*-
-"""
-make_bundle.py — LV_ESP32
-Arma el ZIP para los usuarios (se sube a GitHub Releases, no al repo).
-
-Lleva los VIs y la carpeta LV_Firmware\\ (el .exe con las herramientas nativas y
-los binarios). No lleva Python, PlatformIO, el codigo de tools\\ ni las fuentes
-del firmware: el usuario no compila ni instala nada.
-
-Antes: tools\\build_exe.bat   (arma dist\\LV_Firmware\\)
-
-    python tools\\make_bundle.py
-    python tools\\make_bundle.py --stamp v3
-"""
 import argparse
 import os
 import sys
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import lv_core as core                                            # noqa: E402
+import lv_core as core
 
 DIST = os.path.join(core.REPO, "dist")
 APP = os.path.join(DIST, "LV_Firmware")
 
-# Carpetas (por nombre) que NUNCA entran
 EXCLUDE_DIRS = {"LV_ESP32.wiki", ".git", ".github", "dist", "__pycache__", ".pio"}
-# Rutas (desde la raiz del repo) que no entran: son de desarrollo
 EXCLUDE_PATHS = ("Config/python", "Config/arduino-cli", "Config/flashtools",
                  "tools", "firmware")
 EXCLUDE_EXT = {".pyc", ".lvlps", ".vip", ".zip"}
 EXCLUDE_FILES = {".gitignore", "platformio.ini"}
 
-# herramienta nativa por metodo de carga
 NEEDS = {
     "esptool":     ["esptool/esptool.exe"],
     "dfu":         ["dfu-util/dfu-util.exe"],
@@ -49,8 +32,6 @@ def human(n):
 
 
 def check(board_keys):
-    """Verifica que el paquete vaya a servir de verdad. Aqui es donde se
-    detecta que falta algo, no en la maquina del usuario."""
     problems = []
     if not os.path.isfile(os.path.join(APP, "LV_Firmware.exe")):
         problems.append("Falta dist\\LV_Firmware\\LV_Firmware.exe\n"
@@ -95,7 +76,6 @@ def build(stamp):
             except OSError as e:
                 print("   (omitido %s: %s)" % (arc, e))
 
-        # 1) los VIs y el resto del repo, sin lo de desarrollo
         for root, dirs, files in os.walk(core.REPO):
             rel_root = os.path.relpath(root, core.REPO)
             dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not _skip_path(
@@ -106,7 +86,6 @@ def build(stamp):
                 full = os.path.join(root, f)
                 add(full, os.path.join(name, os.path.relpath(full, core.REPO)))
 
-        # 2) el .exe con sus herramientas y binarios
         for root, dirs, files in os.walk(APP):
             for f in files:
                 full = os.path.join(root, f)

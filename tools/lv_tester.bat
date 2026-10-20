@@ -1,12 +1,4 @@
 @echo off
-REM ===========================================================================
-REM  lv_tester.bat — LV_ESP32 v3
-REM  Probador de comandos (botones + linea de comandos). Usa el mismo protocolo
-REM  que los VIs de LabVIEW. Cierra los VIs que tengan el puerto abierto.
-REM
-REM     "<repo>\tools\lv_tester.bat"                 elige el puerto en la ventana
-REM     "<repo>\tools\lv_tester.bat" --port COM6      conecta solo
-REM ===========================================================================
 setlocal
 set "TOOLS=%~dp0"
 set "REPO=%TOOLS%.."

@@ -1,15 +1,4 @@
 #!/usr/bin/env sh
-# ===========================================================================
-#  lv_hub.sh - LV_ESP32 Instrument Hub (Linux/macOS, equivale a lv_hub.bat)
-#  Funciona desde cualquier carpeta: todo se calcula desde la ubicacion del
-#  script. La primera vez crea un entorno virtual en <repo>/.venv e instala
-#  PyQt5, pyserial y esptool (necesita internet, una sola vez).
-#  dfu-util y avrdude se instalan con el sistema: sudo apt install dfu-util avrdude
-#
-#     tools/lv_hub.sh                 lanzador
-#     tools/lv_hub.sh --port /dev/ttyUSB0
-#     tools/lv_hub.sh --sim               sin tarjeta
-# ===========================================================================
 TOOLS="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(dirname "$TOOLS")"
 VENV="$REPO/.venv"

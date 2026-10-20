@@ -1,17 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-lv_probe.py — LV_ESP32 v3
-Prueba automatica del protocolo de canales contra la TARJETA REAL, sin LabVIEW.
-Usa lv_wire.py (el mismo Flush -> Write -> Read de los VIs). Lee la identidad y
-prueba todos los tipos de canal que la tarjeta dice tener.
-
-    Config\\python\\python.exe tools\\lv_probe.py --port COM5
-    Config\\python\\python.exe tools\\lv_probe.py --port COM5 --do 0 --ai 2 --pwm 1
-
-Los numeros de --do / --ai / --pwm / --servo son CANALES (ver firmware\\PINOUT.md).
-Codigo de salida 0 si todo paso, 1 si algo fallo, 2 si no abre el puerto.
-"""
-
 import argparse
 import os
 import sys
@@ -123,7 +109,7 @@ def run(w, a):
 
     print("\n-- robustez --")
     ok("comando desconocido -> 'X','X'", w.txrx(bytes([0x77]), "ack").rx == b"XX")
-    r = w.txrx(bytes([0x01, 0x00]), "ack")       # trama incompleta: el firmware espera 200 ms
+    r = w.txrx(bytes([0x01, 0x00]), "ack")
     ok("trama incompleta -> 'X','X'", r.rx == b"XX", repr(r.rx))
     ok("sigue vivo (ping)", w.cmd("ping").rx == b"AA")
 
@@ -137,7 +123,7 @@ def main():
     ap.add_argument("--servo", type=int, default=0, help="canal servo de prueba")
     ap.add_argument("--dio", type=int, dest="do", help=argparse.SUPPRESS)
     ap.add_argument("--adc", type=int, dest="ai", help=argparse.SUPPRESS)
-    ap.add_argument("--peer-port", help=argparse.SUPPRESS)      # ESP-NOW ya no existe
+    ap.add_argument("--peer-port", help=argparse.SUPPRESS)
     a = ap.parse_args()
 
     print("=" * 62)
@@ -145,7 +131,7 @@ def main():
     print("=" * 62)
     try:
         w = W.Wire(a.port, timeout=1.5)
-    except Exception as e:                                       # noqa: BLE001
+    except Exception as e:
         print("\nERROR de puerto: %s" % e)
         print("Cierra el monitor serie, el Arduino IDE o el VI que lo tenga abierto.")
         sys.exit(2)

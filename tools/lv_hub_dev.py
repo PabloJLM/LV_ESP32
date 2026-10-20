@@ -1,20 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-lv_hub_dev.py — LV_ESP32
-Capa de dispositivo del Instrument Hub.
-
-Una sola sesion serie compartida por todos los instrumentos (el puerto solo lo
-puede abrir una aplicacion a la vez). Cada comando va protegido con un lock,
-asi que dos instrumentos corriendo a la vez se intercalan sin pisarse.
-
-Habla el MISMO protocolo v3 que LabVIEW (ver lv_wire.py y
-firmware/lv_protocol.cpp). No necesita firmware especial: el muestreo es por
-software, una muestra por comando, asi que la velocidad la pone el USB
-(del orden de cientos de muestras por segundo).
-
-SimDevice imita una tarjeta para probar la interfaz sin hardware.
-"""
-
 import math
 import random
 import threading
@@ -22,11 +5,6 @@ import time
 
 import lv_wire
 
-# ---------------------------------------------------------------------------
-# Pines por tarjeta (copia legible de firmware/lv_boards.h, variante base).
-# La variante ONLINE solo recorta el final de DI y DO, y el recorte sale de
-# los conteos que manda la identidad (0xEF).
-# ---------------------------------------------------------------------------
 PINS = {
     "ESP32-U": {
         "di":  ["GPIO0", "GPIO15", "GPIO36", "GPIO39", "GPIO34", "GPIO35",
@@ -67,7 +45,6 @@ PINS = {
 }
 PINS["SIM"] = PINS["ESP32-U"]
 
-# Tension de referencia del ADC y de las salidas (V)
 VREF = {"UNO": 5.0, "NANO": 5.0}
 DEFAULT_VREF = 3.3
 
@@ -77,7 +54,6 @@ class DeviceError(Exception):
 
 
 class Device(object):
-    """Sesion con la tarjeta. Todos los metodos son seguros entre hilos."""
 
     def __init__(self):
         self.lock = threading.RLock()
@@ -90,17 +66,16 @@ class Device(object):
         self.vref = DEFAULT_VREF
         self.simulated = False
 
-    # --- conexion -----------------------------------------------------------
     def open(self, port):
         try:
             w = lv_wire.Wire(port, timeout=0.5)
-        except Exception as e:                                    # noqa: BLE001
+        except Exception as e:
             raise DeviceError("No se pudo abrir %s: %s" % (port, e))
         ident = None
-        for _ in range(3):                 # el primer comando a veces llega tarde
+        for _ in range(3):
             try:
                 ident = w.identity()
-            except Exception:                                     # noqa: BLE001
+            except Exception:
                 ident = None
             if ident and "n" in ident:
                 break
@@ -135,7 +110,6 @@ class Device(object):
                    n["di"], n["do"], n["ai"], n["ao"], n["pwm"]))
 
     def pin(self, kind, ch):
-        """Nombre del pin fisico de un canal, p. ej. pin('ai', 0) -> 'GPIO36'."""
         lst = PINS.get(self.board, {}).get(kind, [])
         return lst[ch] if ch < len(lst) else "?"
 
@@ -143,13 +117,12 @@ class Device(object):
         return ["%s%d  (%s)" % (kind.upper(), i, self.pin(kind, i))
                 for i in range(self.n.get(kind, 0))]
 
-    # --- bajo nivel ---------------------------------------------------------
     def _cmd(self, name, args):
         if self.wire is None:
             raise DeviceError("No hay tarjeta conectada.")
         try:
             return self.wire.cmd(name, args)
-        except Exception as e:                                    # noqa: BLE001
+        except Exception as e:
             raise DeviceError("Error de comunicacion: %s" % e)
 
     def _ack(self, name, args):
@@ -158,7 +131,6 @@ class Device(object):
         return rx[:2] == b"AA"
 
     def ai_raw(self, ch):
-        """0..4095, o None si el canal no esta disponible / no respondio."""
         with self.lock:
             rx = self._cmd("ai", (ch,)).rx
         try:
@@ -168,7 +140,6 @@ class Device(object):
         return v if v >= 0 else None
 
     def ai(self, ch):
-        """Tension en voltios (o None)."""
         v = self.ai_raw(ch)
         return None if v is None else v * self.vref / 4095.0
 
@@ -188,9 +159,7 @@ class Device(object):
             return rx[1:2] == b"1"
         return None
 
-    # --- salidas analogicas unificadas: "AO0", "PWM1" -----------------------
     def outputs(self):
-        """[(clave, texto)] de todo lo que puede sacar una tension."""
         out = []
         for i in range(self.n["ao"]):
             out.append(("AO%d" % i, "AO%d  (DAC, %s)" % (i, self.pin("ao", i))))
@@ -203,7 +172,6 @@ class Device(object):
         return self.vref
 
     def write_out(self, key, volts):
-        """Pone 'volts' en una salida (DAC 8 bits o duty del PWM)."""
         code = max(0.0, min(255.0, volts / self.vref * 255.0))
         if key.startswith("AO"):
             return self.ao_raw(int(key[2:]), code)
@@ -212,22 +180,9 @@ class Device(object):
         raise DeviceError("Salida desconocida: %s" % key)
 
 
-# ---------------------------------------------------------------------------
-# Simulador
-# ---------------------------------------------------------------------------
 class SimDevice(Device):
-    """Tarjeta de mentira con el mismo API.
 
-        AI0  lee lo que sale por AO0 (lazo directo, con ruido)
-        AI1  AO0 a traves de un filtro RC pasa-bajos (fc = 2 Hz)
-        AI2  senoidal de 3 Hz, 1.2 Vpp, montada en 1.65 V
-        AI3  nodo de un diodo alimentado desde AO0 por 1 kΩ (curva I-V)
-        AI4  divisor 10 kΩ / 4.7 kΩ (para el ohmetro con Rref = 10 kΩ)
-        AI5  cuadrada de 1 Hz 0..3.3 V
-        DI   cuentan en binario a 2 Hz
-    """
-
-    LATENCY = 0.0015            # s por comando, parecido a un USB real
+    LATENCY = 0.0015
 
     def __init__(self):
         Device.__init__(self)
@@ -261,7 +216,6 @@ class SimDevice(Device):
             self._wait()
             t = time.perf_counter() - self._t0
             vs = self._vout()
-            # filtro RC continuo
             now = time.perf_counter()
             tau = 1.0 / (2 * math.pi * 2.0)
             self._rc += (vs - self._rc) * (1 - math.exp(-(now - self._rc_t) / tau))

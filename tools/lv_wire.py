@@ -1,31 +1,12 @@
-# -*- coding: utf-8 -*-
-"""
-lv_wire.py — LV_ESP32 v3
-El protocolo en UN solo lugar, tal como lo ejecutan los VIs de LabVIEW:
-
-        Flush  ->  Write N bytes  ->  Read (2 bytes | hasta '\\n')
-
-Lo usan el probador (lv_tester.py) y la prueba automatica (lv_probe.py). Si un
-comando funciona aqui, el mismo juego de bytes funciona en LabVIEW: lo unico
-que cambia es quien abre el puerto.
-
-Tabla de comandos = la misma de firmware/lv_protocol.cpp.
-"""
-
 import time
 
 try:
     import serial
-except ImportError:          # el probador sigue importando; fallara al abrir
+except ImportError:
     serial = None
 
 BAUD = 115200
 
-# nombre -> (codigo, [(argumento, minimo, maximo)], tipo_de_respuesta, ayuda)
-#   respuesta: "ack"  2 bytes  'A','A' / 'X','X'
-#              "dig"  2 bytes  'A','0' / 'A','1' / 'X','X'
-#              "int"  una linea ASCII con un entero (analogRead)
-#              "line" una linea ASCII
 SIMPLE = {
     "do":      (0x01, [("canal", 0, 255), ("valor", 0, 1)],            "ack",  "salida digital"),
     "di":      (0x02, [("canal", 0, 255)],                             "dig",  "entrada digital"),
@@ -39,13 +20,11 @@ SIMPLE = {
     "neoopt":  (0x0A, [("opcion", 0, 255)],                            "ack",  "pin de la tira NeoPixel"),
     "id":      (0xEF, [],                                              "line", "identidad"),
     "ping":    (0xF0, [],                                              "ack",  "ping"),
-    # variante ONLINE
     "wconn":   (0xC2, [],                                              "ack",  "WiFi: conectar"),
     "wstat":   (0xC3, [],                                              "line", "WiFi/FTP: estado"),
     "wdisc":   (0xC4, [],                                              "ack",  "WiFi: desconectar"),
     "ftp":     (0xC6, [("on", 0, 1)],                                  "ack",  "FTP + SD on/off"),
 }
-# con cadenas: se arman distinto
 STRINGS = {
     "lcd":     (0x09, "lcd [addr] col fila texto", "ack", "LCD I2C (addr 0x27 por defecto)"),
     "wsave":   (0xC1, "wsave ssid [clave]",         "ack", "WiFi: guardar credenciales"),
@@ -55,7 +34,6 @@ REPLY = {n: v[2] for n, v in list(SIMPLE.items()) + list(STRINGS.items())}
 
 
 def build(name, args=(), text=None, text2=""):
-    """Arma los bytes EXACTOS que manda LabVIEW."""
     if name in SIMPLE:
         code, spec, _, _ = SIMPLE[name]
         if len(args) != len(spec):
@@ -68,7 +46,7 @@ def build(name, args=(), text=None, text2=""):
                 raise ValueError("%s: %s debe estar entre %d y %d" % (name, nm, lo, hi))
             out.append(v)
         if name == "di":
-            out.append(0)                 # el dummy que manda el VI
+            out.append(0)
         return bytes(out)
     if name == "lcd":
         addr, col, row = [int(x) for x in args]
@@ -84,7 +62,6 @@ def build(name, args=(), text=None, text2=""):
 
 
 def raw_reply_kind(frame):
-    """Para bytes crudos: deduce como leer la respuesta por el codigo."""
     for n, v in list(SIMPLE.items()) + list(STRINGS.items()):
         if v[0] == frame[0]:
             return v[2]
@@ -100,7 +77,6 @@ class Result:
         return self.rx.decode("latin-1", "replace").replace("\r", "").replace("\n", "\\n")
 
     def verdict(self):
-        """(ok, texto legible)."""
         rx, k = self.rx, self.kind
         if k in ("ack", "dig"):
             if len(rx) < 2:
@@ -129,18 +105,14 @@ class Result:
 
 
 class Wire:
-    """Un puerto serie con el comportamiento de los VIs."""
 
     def __init__(self, port=None, baud=BAUD, timeout=1.0, boot_delay=2.0, transport=None):
         self.timeout = timeout
-        if transport is not None:                  # pruebas sin hardware
+        if transport is not None:
             self.s = transport
             return
         if serial is None:
             raise RuntimeError("Falta pyserial.")
-        # VISA tambien baja DTR/RTS al abrir: el ESP32 se reinicia. Se espera
-        # el arranque antes del primer comando, como hay que hacer en LabVIEW
-        # (un Wait de ~2 s despues de Open).
         self.s = serial.Serial(port, baud, timeout=timeout, write_timeout=2)
         time.sleep(boot_delay)
         self.s.reset_input_buffer()
@@ -172,10 +144,9 @@ class Wire:
         return bytes(buf)
 
     def txrx(self, frame, kind):
-        """Flush -> Write -> Read, igual que un subVI."""
-        self.s.reset_input_buffer()                # Flush
+        self.s.reset_input_buffer()
         t0 = time.time()
-        self.s.write(frame)                        # Write N bytes
+        self.s.write(frame)
         rx = self._read_n(2) if kind in ("ack", "dig") else self._read_line()
         return Result(frame, rx, kind, (time.time() - t0) * 1000.0)
 
@@ -183,7 +154,6 @@ class Wire:
         return self.txrx(build(name, args, text, text2), REPLY[name])
 
     def identity(self):
-        """Devuelve dict con variante, version, mac, placa y cuantos canales."""
         r = self.cmd("id")
         ok, line = r.verdict()
         if not ok:

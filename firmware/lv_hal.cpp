@@ -1,7 +1,3 @@
-/*
- * lv_hal.cpp — LV_ESP32 v3
- * Implementacion de los canales logicos. Los pines salen de lv_boards.h.
- */
 #include "lv_hal.h"
 #include "lv_boards.h"
 #include <Adafruit_NeoPixel.h>
@@ -13,7 +9,6 @@
   #include "lv_online.h"
 #endif
 
-/* --- tablas (el -1 final es centinela: permite listas vacias) -------------- */
 static const int16_t T_DI[]  = { LV_T_DI    -1 };
 static const int16_t T_DO[]  = { LV_T_DO    -1 };
 static const int16_t T_AI[]  = { LV_T_AI    -1 };
@@ -37,9 +32,6 @@ static_assert(sizeof(T_AI_ADC2) - 1 == sizeof(T_AI) / sizeof(T_AI[0]) - 1,
               "LV_T_AI_ADC2 debe tener un valor por cada canal AI");
 #endif
 
-/* ESP32: PWM usa LEDC 0..3 a 1 kHz/8 bits y servo usa LEDC 4..7 a 50 Hz/14 bits.
-   Los timers del LEDC se reparten por pares de canal, asi que ambos grupos
-   nunca comparten timer (no hay conflicto de frecuencia). */
 #ifdef LV_ARCH_ESP32
   #define SERVO_CH0 4
 #endif
@@ -60,7 +52,6 @@ uint8_t lv_count(LvType t) {
   }
 }
 
-/* --- NeoPixel -------------------------------------------------------------- */
 static Adafruit_NeoPixel* strip = nullptr;
 static uint8_t neoOpt = 0;
 
@@ -78,7 +69,7 @@ bool lv_neoSelect(uint8_t opt) {
   if (strip) {
     strip->clear();
     strip->show();
-    delete strip;                      /* el destructor suelta el pin viejo */
+    delete strip;
     strip = nullptr;
   }
   neoMake(opt);
@@ -97,7 +88,6 @@ bool lv_neoOne(uint8_t i, uint8_t r, uint8_t g, uint8_t b) {
   return true;
 }
 
-/* --- digital ---------------------------------------------------------------- */
 bool lv_dWrite(uint8_t ch, uint8_t v) {
   if (ch >= N_DO) return false;
   pinMode(T_DO[ch], OUTPUT);
@@ -112,20 +102,19 @@ bool lv_dRead(uint8_t ch, uint8_t* v) {
   return true;
 }
 
-/* --- analogico: SIEMPRE 0..4095 --------------------------------------------- */
 int16_t lv_aRead(uint8_t ch) {
   if (ch >= N_AI) return -2;
   int16_t pin = T_AI[ch];
 #if defined(LV_ARCH_ESP32)
   #ifdef LV_ONLINE
-  if (T_AI_ADC2[ch] && lv_radioActive()) return -1;   /* ADC2 inservible con WiFi */
+  if (T_AI_ADC2[ch] && lv_radioActive()) return -1;
   #endif
-  for (uint8_t i = 0; i < 8; i++) analogRead(pin);    /* descarta transitorios */
+  for (uint8_t i = 0; i < 8; i++) analogRead(pin);
   return (int16_t)analogRead(pin);
 #elif defined(LV_ARCH_AVR)
   (void)analogRead(pin);
-  uint16_t v = (uint16_t)analogRead(pin);             /* 10 bits */
-  return (int16_t)(((uint32_t)v * 4095u) / 1023u);    /* escala exacta a 12 bits */
+  uint16_t v = (uint16_t)analogRead(pin);
+  return (int16_t)(((uint32_t)v * 4095u) / 1023u);
 #else
   (void)analogRead(pin);
   return (int16_t)analogRead(pin);
@@ -135,7 +124,7 @@ int16_t lv_aRead(uint8_t ch) {
 bool lv_aWrite(uint8_t ch, uint8_t v) {
   if (ch >= N_AO) return false;
 #if defined(LV_ARCH_ESP32) && defined(CONFIG_IDF_TARGET_ESP32)
-  dacWrite(T_AO[ch], v);                              /* DAC real, no PWM */
+  dacWrite(T_AO[ch], v);
   return true;
 #elif defined(LV_ARCH_STM32) && defined(HAL_DAC_MODULE_ENABLED)
   analogWrite(T_AO[ch], v);
@@ -146,7 +135,6 @@ bool lv_aWrite(uint8_t ch, uint8_t v) {
 #endif
 }
 
-/* --- PWM -------------------------------------------------------------------- */
 #ifdef LV_ARCH_ESP32
 static bool pwmOn[4];
 #endif
@@ -166,7 +154,6 @@ bool lv_pwm(uint8_t ch, uint8_t duty) {
   return true;
 }
 
-/* --- servo ------------------------------------------------------------------ */
 #ifdef LV_ARCH_ESP32
 static bool svOn[4];
 #else
@@ -182,7 +169,7 @@ bool lv_servo(uint8_t ch, uint8_t angle) {
     svOn[ch] = true;
   }
   uint32_t us = 500 + (uint32_t)angle * (2400 - 500) / 180;
-  ledcWrite(T_SV[ch], us * 16384UL / 20000UL);        /* periodo 20 ms */
+  ledcWrite(T_SV[ch], us * 16384UL / 20000UL);
 #else
   if (!svObj[ch].attached()) svObj[ch].attach(T_SV[ch], 500, 2400);
   svObj[ch].write(angle);
@@ -190,7 +177,6 @@ bool lv_servo(uint8_t ch, uint8_t angle) {
   return true;
 }
 
-/* --- arranque --------------------------------------------------------------- */
 void lv_halBegin() {
 #if defined(LV_ARCH_ESP32) || defined(LV_ARCH_STM32)
   analogReadResolution(12);

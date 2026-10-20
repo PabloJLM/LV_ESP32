@@ -1,29 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-lv_hub.py — LV_ESP32 Instrument Hub
-Lanzador de instrumentos al estilo de NI ELVISmx Instrument Launcher, para la
-tarjeta LV_ESP32 con su firmware normal (protocolo v3, el mismo de LabVIEW).
-
-    DMM      Multimetro: V DC, V AC (RMS), A DC (shunt), Ω (divisor), continuidad
-    Scope    Osciloscopio de 2 canales con disparo por flanco y mediciones
-    FGEN     Generador de funciones (DAC, o PWM con filtro RC) con barrido
-    VPS      Fuente variable: 2 salidas de tension fija
-    Bode     Analizador de Bode (magnitud y fase)
-    DSA      Analizador de espectro (FFT)
-    DigIn    Lector digital
-    DigOut   Escritor digital con patrones
-    2-Wire   Trazador de curvas I-V (diodos, LEDs, resistencias)
-
-El muestreo es por software (una muestra por comando por USB): cientos de
-muestras por segundo. Sirve para senales lentas (hasta decenas de Hz), no
-reemplaza a un osciloscopio de banco.
-
-    lv_hub.py                       lanzador
-    lv_hub.py --port COM5           conecta solo
-    lv_hub.py --sim                 sin tarjeta (simulador)
-    lv_hub.py --sim --tool scope    abre directo un instrumento
-"""
-
 import argparse
 import cmath
 import collections
@@ -34,21 +8,18 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from lv_hub_dev import Device, DeviceError, SimDevice                 # noqa: E402
-from lv_hub_ui import (C_CH, C_MARK, QSS, QApplication, QButtonGroup,    # noqa: E402
+from lv_hub_dev import Device, DeviceError, SimDevice
+from lv_hub_ui import (C_CH, C_MARK, QSS, QApplication, QButtonGroup,
                        QCheckBox, QColor, QFrame, QGridLayout, QHBoxLayout,
                        QIcon, QLabel, QPushButton, QSize, QSizePolicy, QToolButton, QVBoxLayout, QWidget, Qt, QTimer, Runner,
                        InstrumentWindow, Knob, Led, Plot, combo, dspin, eng,
                        fmt_time, group, hint, ispin, make_icon, row, sleep_while)
 
-import lv_core                                                         # noqa: E402
+import lv_core
 
 perf = time.perf_counter
 
 
-# ===========================================================================
-# Utilidades numericas (sin numpy)
-# ===========================================================================
 def mean(v):
     return sum(v) / len(v) if v else 0.0
 
@@ -65,7 +36,6 @@ def rms(v):
 
 
 def freq_of(ts, vs):
-    """Frecuencia por cruces ascendentes del valor medio, con histeresis."""
     if len(vs) < 6:
         return None
     lo, hi = min(vs), max(vs)
@@ -78,7 +48,6 @@ def freq_of(ts, vs):
     for i in range(1, len(vs)):
         if not state and vs[i] > m + h:
             state = True
-            # interpola el cruce del medio entre la ultima muestra baja y esta
             j = i
             while j > 0 and vs[j - 1] > m:
                 j -= 1
@@ -95,7 +64,6 @@ def freq_of(ts, vs):
 
 
 def sine_fit(ts, vs, f):
-    """Ajusta v = a·sin(wt) + b·cos(wt) + c. Devuelve (amplitud, fase, c)."""
     w = 2 * math.pi * f
     A = [[0.0] * 3 for _ in range(3)]
     B = [0.0] * 3
@@ -105,7 +73,6 @@ def sine_fit(ts, vs, f):
             B[i] += row_[i] * v
             for j in range(3):
                 A[i][j] += row_[i] * row_[j]
-    # Gauss con pivoteo
     M = [A[i] + [B[i]] for i in range(3)]
     for c in range(3):
         p = max(range(c, 3), key=lambda r: abs(M[r][c]))
@@ -160,9 +127,6 @@ def ai_items(dev):
     return [(i, t) for i, t in enumerate(dev.channels("ai"))]
 
 
-# ===========================================================================
-# DMM
-# ===========================================================================
 class DMM(InstrumentWindow):
     TITLE = "Multímetro digital (DMM)"
     MODES_LIST = [("vdc", "V⎓", "Voltaje DC"),
@@ -350,9 +314,6 @@ class DMM(InstrumentWindow):
             self.lb_mode.setText(self.lb_mode.text().split("  [")[0] + "  [NULL]")
 
 
-# ===========================================================================
-# Osciloscopio
-# ===========================================================================
 TDIV = [0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0]
 VDIV = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0]
 
@@ -441,6 +402,8 @@ class Scope(InstrumentWindow):
         self.redraw_empty()
 
     def refresh_channels(self):
+        if self.vref_changed():
+            self.sp_level.setValue(self.dev.vref / 2)
         items = ai_items(self.dev)
         for k, w in enumerate(self.chw):
             self.fill(w["src"], items)
@@ -494,7 +457,6 @@ class Scope(InstrumentWindow):
                 last_post = now
                 r.post((now, [list(b) for b in bufs]))
 
-    # --- dibujo ---------------------------------------------------------------
     def redraw_empty(self):
         self.plot.xr = (0, 10)
         self.plot.yr = (-4, 4)
@@ -505,7 +467,6 @@ class Scope(InstrumentWindow):
         self.bufs = bufs
         c = self.cfg
         win = c["win"]
-        # tasa por canal en el ultimo segundo
         for b in bufs:
             if b:
                 n = sum(1 for t, _v in b if t >= now - 1.0)
@@ -641,18 +602,14 @@ class Scope(InstrumentWindow):
         self.save_csv(["t0 (s)", "CH0 (V)", "t1 (s)", "CH1 (V)"], rows, "scope")
 
 
-# ===========================================================================
-# Generador de funciones
-# ===========================================================================
 def wave(shape, ph, duty=0.5):
-    """-1..1"""
     if shape == "sine":
         return math.sin(2 * math.pi * ph)
     if shape == "tri":
         return 1.0 - 4.0 * abs(ph - 0.5)
     if shape == "square":
         return 1.0 if ph < duty else -1.0
-    return 2.0 * ph - 1.0                  # diente de sierra
+    return 2.0 * ph - 1.0
 
 
 class FGen(InstrumentWindow):
@@ -665,7 +622,7 @@ class FGen(InstrumentWindow):
         lay = QHBoxLayout(self.body)
         lay.setContentsMargins(8, 4, 8, 0)
         left = QVBoxLayout()
-        g, f = group("Vista previa (2 periodos)")
+        g, f = group("Señal de salida (2 periodos)")
         self.plot = Plot()
         self.plot.setMinimumSize(420, 260)
         self.plot.xfmt = lambda v: eng(v, "s", 2)
@@ -726,12 +683,19 @@ class FGen(InstrumentWindow):
         lay.addLayout(right)
         self.watch(self.k_f, self.k_a, self.k_o, self.sp_duty, self.cb_out, self.ck_sw,
                    self.sp_f0, self.sp_f1, self.sp_fs, self.sp_ti)
+        self.live = None
+        self.anim = QTimer(self)
+        self.anim.setInterval(33)
+        self.anim.timeout.connect(self.animate)
 
     def refresh_channels(self):
         self.fill(self.cb_out, self.dev.outputs())
         vmax = self.dev.vref
         self.k_a.setRange(0.0, vmax)
         self.k_o.setRange(0.0, vmax)
+        if self.vref_changed():
+            self.k_a.setValue(round(vmax * 0.6, 2))
+            self.k_o.setValue(round(vmax / 2, 2))
 
     def shape(self):
         return self.bg.checkedButton().property("key")
@@ -749,7 +713,26 @@ class FGen(InstrumentWindow):
         v = c["o"] + c["a"] / 2.0 * wave(c["shape"], ph, c["duty"])
         return max(0.0, min(c["vmax"], v))
 
+    def animate(self):
+        if not self.live:
+            return
+        t, ph, f, v = self.live
+        c = self.cfg
+        ph = (ph + f * (perf() - t)) % 1.0
+        T = 2.0 / f
+        n = 400
+        xs = [T * i / n for i in range(n + 1)]
+        ys = [self.value(c, (ph - (T - x) * f) % 1.0) for x in xs]
+        self.plot.xr = (0, T)
+        self.plot.yr = (0, c["vmax"])
+        self.plot.hlines = [(c["o"], C_MARK)]
+        self.plot.overlay = [(C_CH[0], "Salida %s   f %s" % (eng(v, "V", 3), eng(f, "Hz", 3)))]
+        self.plot.set_traces([(xs, ys, C_CH[0]), ([xs[-1]], [v], C_MARK, True)])
+
     def preview(self):
+        if self.running:
+            return
+        self.plot.overlay = []
         c = self.cfg
         f = c["f"]
         T = 2.0 / f
@@ -767,11 +750,16 @@ class FGen(InstrumentWindow):
             self.set_status("Esta tarjeta no tiene salida analógica ni PWM.", "err")
             return False
         self.cb_out.setEnabled(False)
+        self.live = None
+        self.anim.start()
         self.set_status("Generando en %s" % self.cfg["out"], "ok")
 
     def on_stopped(self):
+        self.anim.stop()
+        self.live = None
         self.cb_out.setEnabled(True)
         self.lb_rate.setText("Detenido (salida en 0 V)")
+        self.preview()
 
     def work(self, r):
         dev = self.dev
@@ -798,7 +786,9 @@ class FGen(InstrumentWindow):
                     f = c["f"]
                 ph = (ph + f * (now - last)) % 1.0
                 last = now
-                dev.write_out(key, self.value(c, ph))
+                v = self.value(c, ph)
+                dev.write_out(key, v)
+                self.live = (now, ph, f, v)
                 n += 1
                 if now - tr >= 0.5:
                     r.post((n / (now - tr), f))
@@ -821,9 +811,6 @@ class FGen(InstrumentWindow):
             self.set_status("Generando en %s" % self.cfg["out"], "ok")
 
 
-# ===========================================================================
-# Fuente variable
-# ===========================================================================
 class VPS(InstrumentWindow):
     TITLE = "Fuente de alimentación variable (VPS)"
     MODES = False
@@ -851,7 +838,7 @@ class VPS(InstrumentWindow):
         g, f = group("Notas")
         f.addWidget(hint("No es una fuente de potencia: el DAC y el PWM entregan pocos "
                          "mA. Para alimentar una carga pon un seguidor con op-amp o un "
-                         "transistor. El DAC es de 8 bits (pasos de ~13 mV a 3.3 V). "
+                         "transistor. El DAC y el PWM son de 8 bits (256 pasos de 0 a Vref). "
                          "Al presionar Stop las salidas vuelven a 0 V."), 0, 0)
         lay.addWidget(g)
         lay.addStretch(1)
@@ -911,9 +898,6 @@ class VPS(InstrumentWindow):
         self.sup[i]["lcd"].setText("%.3f V" % v)
 
 
-# ===========================================================================
-# Digital
-# ===========================================================================
 class DigOut(InstrumentWindow):
     TITLE = "Escritor digital (DigOut)"
     PATTERNS = [("manual", "Manual"), ("ramp", "Rampa (cuenta binaria)"),
@@ -1076,9 +1060,6 @@ class DigIn(InstrumentWindow):
         self.lb_val.setText("%d   0x%03X   %s" % (val, val, format(val, "0%db" % max(1, len(bits)))))
 
 
-# ===========================================================================
-# Bode
-# ===========================================================================
 class Bode(InstrumentWindow):
     TITLE = "Analizador de Bode"
     MODES = False
@@ -1147,6 +1128,12 @@ class Bode(InstrumentWindow):
         self.render()
 
     def refresh_channels(self):
+        v = self.dev.vref
+        self.sp_amp.setMaximum(v)
+        self.sp_off.setMaximum(v)
+        if self.vref_changed():
+            self.sp_amp.setValue(round(0.45 * v, 2))
+            self.sp_off.setValue(round(v / 2, 2))
         self.fill(self.cb_out, self.dev.outputs())
         items = ai_items(self.dev)
         self.fill(self.cb_in, items)
@@ -1272,9 +1259,6 @@ class Bode(InstrumentWindow):
                         "%.2f" % ph] for f, g, ph in self.pts], "bode")
 
 
-# ===========================================================================
-# DSA (espectro)
-# ===========================================================================
 class DSA(InstrumentWindow):
     TITLE = "Analizador dinámico de señales (DSA)"
 
@@ -1367,7 +1351,6 @@ class DSA(InstrumentWindow):
         if T <= 0:
             return
         fs = (n - 1) / T
-        # remuestreo uniforme (interpolacion lineal)
         u, j = [], 0
         for i in range(n):
             t = ts[0] + i / fs
@@ -1418,9 +1401,6 @@ class DSA(InstrumentWindow):
         self.set_status("%d muestras en %s" % (n, fmt_time(T)), "")
 
 
-# ===========================================================================
-# 2-Wire (curva I-V)
-# ===========================================================================
 class IV(InstrumentWindow):
     TITLE = "Analizador corriente-voltaje 2 hilos (2-Wire)"
 
@@ -1485,6 +1465,8 @@ class IV(InstrumentWindow):
         v = self.dev.vref
         self.sp_v0.setMaximum(v)
         self.sp_v1.setMaximum(v)
+        if self.vref_changed():
+            self.sp_v1.setValue(v)
 
     def sync(self):
         self.cfg = {"out": self.cb_out.currentData(), "v0": self.sp_v0.value(),
@@ -1566,9 +1548,6 @@ class IV(InstrumentWindow):
                       [["%.5f" % a, "%.7g" % b, "%.5f" % c] for a, b, c in self.pts], "iv")
 
 
-# ===========================================================================
-# Ayuda de cada instrumento
-# ===========================================================================
 _COMMON = ("\n\nTodas las entradas van de 0 V a la referencia de la tarjeta "
            "(3.3 V en ESP32/K8, 5 V en UNO/Nano). Nunca metas tensiones negativas "
            "ni mayores: usa un divisor y el factor de sonda.\n\n"
@@ -1646,9 +1625,6 @@ IV.HELP = ("Trazador de curvas corriente-voltaje de dos terminales (diodos, "
            "si el filtro es lento. Solo cuadrante positivo (0 a Vref)." + _COMMON)
 
 
-# ===========================================================================
-# Lanzador
-# ===========================================================================
 TOOLS = [
     ("dmm",    "DMM",     "Multímetro digital",          DMM,    ("ai",)),
     ("scope",  "Scope",   "Osciloscopio",                Scope,  ("ai",)),
@@ -1760,7 +1736,6 @@ class Hub(QWidget):
             QTimer.singleShot(100, self.toggle)
         self._autotool = tool
 
-    # --- conexion -------------------------------------------------------------
     def scan(self, prefer=None):
         old = prefer or self.cb_port.currentData()
         self.cb_port.clear()

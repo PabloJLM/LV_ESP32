@@ -1,14 +1,4 @@
 @echo off
-REM ===========================================================================
-REM  lv_hub.bat — LV_ESP32 Instrument Hub (instrumentos estilo NI ELVISmx)
-REM  Usa el Python embebido del repositorio. Si falta PyQt5 lo instala ahi
-REM  mismo (una sola vez, necesita internet).
-REM
-REM     "<repo>\tools\lv_hub.bat"                     lanzador
-REM     "<repo>\tools\lv_hub.bat" --port COM5         conecta solo
-REM     "<repo>\tools\lv_hub.bat" --sim               sin tarjeta
-REM     "<repo>\tools\lv_hub.bat" --port COM5 --tool scope
-REM ===========================================================================
 setlocal
 set "TOOLS=%~dp0"
 set "REPO=%TOOLS%.."
@@ -23,7 +13,6 @@ if not exist "%PY%" (
     exit /b 3
 )
 
-REM --- PyQt5: se instala una sola vez, dentro del repo ----------------------
 "%PY%" -c "import PyQt5" >nul 2>nul
 if errorlevel 1 (
     echo.

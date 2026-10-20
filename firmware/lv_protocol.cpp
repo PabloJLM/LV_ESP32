@@ -1,35 +1,3 @@
-/*
- * ===========================================================================
- * lv_protocol.cpp — LV_ESP32 v3
- * Tesla Lab · Universidad Galileo · Pablo Lopez Mazariegos
- * ---------------------------------------------------------------------------
- * PROTOCOLO v3 — canales logicos (tipo PLC). Mismo USB serial, mismos 2 bytes
- * de respuesta. LabVIEW manda el NUMERO DE CANAL, no el GPIO. Las tablas de
- * canal -> pin de cada tarjeta estan en lv_boards.h y en PINOUT.md.
- *
- * Todos los subVIs hacen:  Flush -> Write N bytes -> Read 2 bytes
- *
- *   Escrituras:  'A','A'      Lecturas digitales: 'A','0'/'1'      Error: 'X','X'
- *
- *   0x01 [ch, val]               DO  digitalWrite         -> 'A','A' / 'X','X'
- *   0x02 [ch, dummy]             DI  digitalRead          -> 'A','0'|'1' / 'X','X'
- *   0x03 [r, g, b]               NeoPixel todos           -> 'A','A'
- *   0x04 [idx, r, g, b]          NeoPixel pixel           -> 'A','A' / 'X','X'
- *   0x05 [ch]                    AI  analogRead           -> "0".."4095"\n
- *                                   -1 = no disponible ahora (ADC2 con WiFi)
- *                                   -2 = canal invalido
- *   0x06 [ch, val]               AO  DAC 0..255           -> 'A','A' / 'X','X'
- *   0x07 [ch, duty]              PWM 0..255               -> 'A','A' / 'X','X'
- *   0x08 [ch, angulo]            SERVO 0..180             -> 'A','A' / 'X','X'
- *   0x09 [addr,col,fila,len,..]  LCD I2C                  -> 'A','A'
- *   0x0A [opcion]                pin de la tira NeoPixel  -> 'A','A' / 'X','X'
- *   0xEF (sin payload)           Identidad ->
- *        "LV,<variante>,<ver>,<mac>,<placa>,<nDI>,<nDO>,<nAI>,<nAO>,<nPWM>,<nSERVO>,<nNEO>\n"
- *   0xF0 (sin payload)           Ping                     -> 'A','A'
- *
- *   Variante ONLINE (-DLV_ONLINE, solo ESP32): 0xC1..0xC6, ver lv_online.h
- * ===========================================================================
- */
 #include <Arduino.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
@@ -43,8 +11,6 @@
 
 static LiquidCrystal_I2C* lcd = nullptr;
 static uint8_t lcdAddr = 0x00;
-
-/* -- helpers ---------------------------------------------------------------- */
 
 static bool readBytes(uint8_t* buf, uint8_t n) {
   uint32_t t = millis();
@@ -63,9 +29,6 @@ static void ack()  { Serial.write('A'); Serial.write('A'); }
 static void nack() { Serial.write('X'); Serial.write('X'); }
 
 #ifdef LV_ONLINE
-/* Lee [la][lb][a...][b...] (dos cadenas con su longitud). Si las longitudes
-   no son validas igual consume los bytes que anuncian, para que no queden en
-   el buffer y se interpreten despues como comandos. */
 static bool readTwoStrings(char* a, uint8_t maxA, bool aRequired,
                            char* b, uint8_t maxB) {
   uint8_t h[2];
@@ -82,8 +45,6 @@ static bool readTwoStrings(char* a, uint8_t maxA, bool aRequired,
 }
 #endif
 
-/* -- setup / loop ------------------------------------------------------------ */
-
 void setup() {
   Serial.begin(115200);
   lv_halBegin();
@@ -94,7 +55,7 @@ void setup() {
 
 void loop() {
 #ifdef LV_ONLINE
-  lv_onlineLoop();                 /* estado del WiFi y atencion del FTP */
+  lv_onlineLoop();
 #endif
   if (!Serial.available()) return;
 
@@ -103,13 +64,13 @@ void loop() {
 
   switch (cmd) {
 
-    case 0x01: {                                   /* DO */
+    case 0x01: {
       if (!readBytes(p, 2)) { nack(); break; }
       if (lv_dWrite(p[0], p[1])) ack(); else nack();
       break;
     }
 
-    case 0x02: {                                   /* DI */
+    case 0x02: {
       if (!readBytes(p, 2)) { nack(); break; }
       uint8_t v;
       if (!lv_dRead(p[0], &v)) { nack(); break; }
@@ -118,44 +79,44 @@ void loop() {
       break;
     }
 
-    case 0x03: {                                   /* NeoPixel todos */
+    case 0x03: {
       if (!readBytes(p, 3)) { nack(); break; }
       lv_neoAll(p[0], p[1], p[2]);
       ack();
       break;
     }
 
-    case 0x04: {                                   /* NeoPixel individual */
+    case 0x04: {
       if (!readBytes(p, 4)) { nack(); break; }
       if (lv_neoOne(p[0], p[1], p[2], p[3])) ack(); else nack();
       break;
     }
 
-    case 0x05: {                                   /* AI: ASCII con \n */
+    case 0x05: {
       if (!readBytes(p, 1)) { Serial.println(-2); break; }
       Serial.println(lv_aRead(p[0]));
       break;
     }
 
-    case 0x06: {                                   /* AO */
+    case 0x06: {
       if (!readBytes(p, 2)) { nack(); break; }
       if (lv_aWrite(p[0], p[1])) ack(); else nack();
       break;
     }
 
-    case 0x07: {                                   /* PWM */
+    case 0x07: {
       if (!readBytes(p, 2)) { nack(); break; }
       if (lv_pwm(p[0], p[1])) ack(); else nack();
       break;
     }
 
-    case 0x08: {                                   /* SERVO */
+    case 0x08: {
       if (!readBytes(p, 2)) { nack(); break; }
       if (lv_servo(p[0], p[1])) ack(); else nack();
       break;
     }
 
-    case 0x09: {                                   /* LCD I2C */
+    case 0x09: {
       if (!readBytes(p, 4)) { nack(); break; }
       uint8_t addr = p[0];
       uint8_t col  = p[1] > 15 ? 15 : p[1];
@@ -176,53 +137,53 @@ void loop() {
       break;
     }
 
-    case 0x0A: {                                   /* pin de la tira NeoPixel */
+    case 0x0A: {
       if (!readBytes(p, 1)) { nack(); break; }
       if (lv_neoSelect(p[0])) ack(); else nack();
       break;
     }
 
 #ifdef LV_ONLINE
-    case 0xC1: {                                   /* guardar WiFi */
+    case 0xC1: {
       char ssid[LV_WIFI_SSID_MAX + 1], pass[LV_WIFI_PASS_MAX + 1];
       if (!readTwoStrings(ssid, LV_WIFI_SSID_MAX, true, pass, LV_WIFI_PASS_MAX)) { nack(); break; }
       if (lv_wifiSaveCreds(ssid, pass)) ack(); else nack();
       break;
     }
 
-    case 0xC2: {                                   /* conectar, no bloquea */
+    case 0xC2: {
       if (lv_wifiConnect()) ack(); else nack();
       break;
     }
 
-    case 0xC3: {                                   /* estado */
+    case 0xC3: {
       char st[48];
       lv_onlineStatus(st, sizeof(st));
       Serial.println(st);
       break;
     }
 
-    case 0xC4: {                                   /* desconectar */
+    case 0xC4: {
       lv_wifiDisconnect();
       ack();
       break;
     }
 
-    case 0xC5: {                                   /* guardar FTP */
+    case 0xC5: {
       char user[LV_FTP_USER_MAX + 1], pass[LV_FTP_PASS_MAX + 1];
       if (!readTwoStrings(user, LV_FTP_USER_MAX, true, pass, LV_FTP_PASS_MAX)) { nack(); break; }
       if (lv_ftpSaveCreds(user, pass)) ack(); else nack();
       break;
     }
 
-    case 0xC6: {                                   /* FTP on/off */
+    case 0xC6: {
       if (!readBytes(p, 1)) { nack(); break; }
       if (lv_ftpSet(p[0] != 0)) ack(); else nack();
       break;
     }
 #endif
 
-    case 0xEF: {                                   /* identidad */
+    case 0xEF: {
       Serial.print(F("LV,"));
       Serial.print(lv_variant());
       Serial.print(',');
@@ -245,7 +206,7 @@ void loop() {
       break;
     }
 
-    case 0xF0: {                                   /* ping */
+    case 0xF0: {
       ack();
       break;
     }

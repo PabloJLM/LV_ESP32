@@ -1,13 +1,4 @@
 @echo off
-REM ===========================================================================
-REM  lv_probe_gui.bat — LV_ESP32
-REM  GUI aparte, solo para "Probar tarjeta". No comparte ventana con
-REM  lv_gui.bat (que es Cargar firmware + WiFi y FTP).
-REM
-REM  Desde LabVIEW (System Exec.vi, "wait until completion" = FALSE):
-REM     "<repo>\tools\lv_probe_gui.bat"                selecciona el puerto en la GUI
-REM     "<repo>\tools\lv_probe_gui.bat" --port COM6     puerto ya elegido
-REM ===========================================================================
 setlocal
 set "TOOLS=%~dp0"
 set "REPO=%TOOLS%.."

@@ -1,32 +1,10 @@
-# -*- coding: utf-8 -*-
-"""
-lv_gui.py — LV_ESP32
-Interfaz grafica que LabVIEW abre para todo lo que NO es instrumentacion:
-cargar el firmware (binarios ya compilados de firmware/bin) y configurar
-WiFi/FTP.
-
-    lv_gui.py                 abre el lanzador con las herramientas
-    lv_gui.py --tool flash    solo "Cargar firmware"
-    lv_gui.py --tool online   solo "WiFi y FTP" (variante ONLINE del ESP32)
-    lv_gui.py --tool flash --port COM5 --board esp32_wrover
-
-Desde LabVIEW (System Exec.vi, "wait until completion" = FALSE):
-    Windows:  "<repo>\\tools\\lv_gui.bat" --tool flash
-    Linux:    "<repo>/tools/lv_gui.sh" --tool flash
-
-Funciona con PyQt5 o con PySide6, el que este instalado.
-"""
-
 import argparse
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import lv_core as core                                            # noqa: E402
+import lv_core as core
 
-# ---------------------------------------------------------------------------
-# Qt: PyQt5 o PySide6, indistinto
-# ---------------------------------------------------------------------------
 try:
     from PyQt5.QtCore import Qt, QThread, pyqtSignal as SignalT
     from PyQt5.QtGui import QFont, QTextCursor
@@ -51,9 +29,6 @@ except ImportError:
         sys.exit(3)
 
 
-# ---------------------------------------------------------------------------
-# Estilo
-# ---------------------------------------------------------------------------
 QSS = """
 /* Paleta tipo LabVIEW: blanco, amarillos calidos y amarillo oscuro.
    Sin esquinas redondeadas; relieve sobrio. */
@@ -93,9 +68,6 @@ QFrame#sep     { background:#b38600; max-height:1px; border:none; }
 """
 
 
-# ---------------------------------------------------------------------------
-# Hilo de trabajo
-# ---------------------------------------------------------------------------
 class Worker(QThread):
     line = SignalT(str)
     step = SignalT(int, str)
@@ -110,13 +82,10 @@ class Worker(QThread):
             ok, msg = self._fn(self.line.emit,
                                lambda p, m: self.step.emit(int(p), m))
             self.done.emit(bool(ok), str(msg))
-        except Exception as e:                                    # noqa: BLE001
+        except Exception as e:
             self.done.emit(False, "Error inesperado: %s" % e)
 
 
-# ---------------------------------------------------------------------------
-# Base con cabecera, log y barra
-# ---------------------------------------------------------------------------
 class ToolWindow(QWidget):
     def __init__(self, title, subtitle):
         super().__init__()
@@ -153,7 +122,6 @@ class ToolWindow(QWidget):
         self.log.setFont(QFont("Consolas" if os.name == "nt" else "Monospace", 9))
         self.root.addWidget(self.log, 1)
 
-    # --- helpers -----------------------------------------------------------
     def add_row(self, r, label, widget, extra=None):
         lab = QLabel(label); lab.setObjectName("field")
         self.form.addWidget(lab, r, 0)
@@ -163,8 +131,6 @@ class ToolWindow(QWidget):
         self.form.setColumnStretch(1, 1)
 
     def append(self, txt):
-        # Un texto que empieza con "\r" reemplaza la ultima linea (barras de
-        # progreso, como en una terminal real).
         if txt.startswith("\r"):
             c = self.log.textCursor()
             c.movePosition(QTextCursor.End)
@@ -205,9 +171,6 @@ class ToolWindow(QWidget):
         self.append(msg)
 
 
-# ---------------------------------------------------------------------------
-# Herramienta 1 — cargar firmware
-# ---------------------------------------------------------------------------
 class FlashWindow(ToolWindow):
     def __init__(self, board=None, port=None):
         super().__init__(
@@ -233,7 +196,7 @@ class FlashWindow(ToolWindow):
 
         self.btn_go = QPushButton("Cargar firmware")
         row = QHBoxLayout(); row.addStretch(1); row.addWidget(self.btn_go)
-        self.root.insertLayout(4, row)   # justo debajo del formulario
+        self.root.insertLayout(4, row)
 
         self.btn_rescan.clicked.connect(self.rescan)
         self.btn_go.clicked.connect(self.go)
@@ -247,14 +210,12 @@ class FlashWindow(ToolWindow):
         return self.cb_board.currentData()
 
     def _needs_port(self):
-        # Nucleo (ST-Link) y Nano ESP32 (DFU) se cargan sin puerto serie
         return core.BOARDS[self.board()].get("needs_port", True)
 
     def _file_ok(self):
         return os.path.isfile(core.resolve_path(self.ed_file.text()))
 
     def _on_board(self):
-        # al cambiar de placa se propone el binario de esa placa
         self.ed_file.setText(core.display_path(core.bin_path(self.board())))
         self._apply_board()
 
@@ -314,9 +275,6 @@ class FlashWindow(ToolWindow):
                     self.cb_port, self.ed_file])
 
 
-# ---------------------------------------------------------------------------
-# Herramienta 3 -- probar el protocolo contra la tarjeta real
-# ---------------------------------------------------------------------------
 class ProbeWindow(ToolWindow):
     def __init__(self, port=None):
         super().__init__(
@@ -333,12 +291,12 @@ class ProbeWindow(ToolWindow):
         self.add_row(2, "Canal AI", self.ed_adc)
         self.ed_pwm = QLineEdit("0")
         self.add_row(3, "Canal PWM", self.ed_pwm)
-        self.ed_peer = QLineEdit("")         # ESP-NOW ya no existe: campo oculto, siempre vacio
+        self.ed_peer = QLineEdit("")
         self.ed_peer.hide()
 
         self.btn_go = QPushButton("Probar")
         row = QHBoxLayout(); row.addStretch(1); row.addWidget(self.btn_go)
-        self.root.insertLayout(4, row)   # justo debajo del formulario
+        self.root.insertLayout(4, row)
 
         self.btn_rescan.clicked.connect(self.rescan)
         self.btn_go.clicked.connect(self.go)
@@ -391,9 +349,6 @@ class ProbeWindow(ToolWindow):
 DEFAULT_BOARD = core.DEFAULT_BOARD
 
 
-# ---------------------------------------------------------------------------
-# Herramienta 4 -- WiFi y FTP (variante ONLINE del ESP32)
-# ---------------------------------------------------------------------------
 class OnlineWindow(ToolWindow):
     def __init__(self, port=None):
         super().__init__(
@@ -428,7 +383,7 @@ class OnlineWindow(ToolWindow):
         row.addStretch(1)
         row.addWidget(self.btn_conn)
         row.addWidget(self.btn_fon)
-        self.root.insertLayout(4, row)   # justo debajo del formulario
+        self.root.insertLayout(4, row)
 
         self._busy = [self.btn_conn, self.btn_disc, self.btn_fon, self.btn_foff,
                       self.btn_stat, self.btn_rescan, self.cb_port, self.ed_ssid,
@@ -445,7 +400,6 @@ class OnlineWindow(ToolWindow):
             lambda: self.run(lambda lk, ln, st: core.online_status(lk, ln)))
         self.rescan(preferred=port)
 
-    # --- puerto -----------------------------------------------------------
     def _close(self):
         if self.link is not None:
             self.link.close()
@@ -456,7 +410,7 @@ class OnlineWindow(ToolWindow):
         ev.accept()
 
     def rescan(self, checked=False, preferred=None):
-        self._close()                       # la placa puede haber cambiado de COM
+        self._close()
         self.cb_port.clear()
         ports = core.list_ports()
         if not ports:
@@ -477,7 +431,6 @@ class OnlineWindow(ToolWindow):
             b.setEnabled(True)
         self.set_status("%d puerto(s) encontrado(s)." % len(ports), "info")
 
-    # --- ejecucion --------------------------------------------------------
     def _with_link(self, port, fn, line, step):
         try:
             if self.link is None or self.link.port != port:
@@ -485,7 +438,7 @@ class OnlineWindow(ToolWindow):
                 step(5, "Abriendo %s (la tarjeta se reinicia, ~2 s)..." % port)
                 self.link = core.LvLink(port)
             return fn(self.link, line, step)
-        except Exception as e:                                    # noqa: BLE001
+        except Exception as e:
             self._close()
             return False, ("No se pudo usar %s: %s  (¿otro programa o un VI "
                            "tiene el puerto abierto?)" % (port, e))
@@ -512,9 +465,6 @@ class OnlineWindow(ToolWindow):
         self.run(lambda lk, ln, st: core.online_ftp_start(lk, user, pw, ln))
 
 
-# ---------------------------------------------------------------------------
-# Lanzador
-# ---------------------------------------------------------------------------
 class Launcher(QWidget):
     def __init__(self):
         super().__init__()
@@ -555,7 +505,6 @@ class Launcher(QWidget):
         self.kids.append(w)
 
 
-# ---------------------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tool", choices=["flash", "probe", "online"], default=None)

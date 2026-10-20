@@ -1,14 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-lv_hub_ui.py — LV_ESP32
-Piezas de interfaz del Instrument Hub, con el aspecto de los paneles de
-NI ELVISmx: marco gris oscuro, secciones grises claras, pantallas negras y
-"Control del instrumento" abajo en cada ventana.
-
-Solo PyQt5 (o PySide6). Las graficas se dibujan con QPainter: no hace falta
-numpy ni pyqtgraph.
-"""
-
 import math
 import time
 import traceback
@@ -23,7 +12,7 @@ try:
                                  QMessageBox, QPushButton, QSizePolicy, QSpinBox,
                                  QToolButton, QVBoxLayout, QWidget)
     QT_NAME = "PyQt5"
-except ImportError:                                                # pragma: no cover
+except ImportError:
     from PySide6.QtCore import Qt, QThread, QRectF, QPointF, QSize, QTimer, Signal
     from PySide6.QtGui import (QColor, QFont, QLinearGradient, QPainter, QPen,
                                QPixmap, QPolygonF, QRadialGradient, QBrush, QIcon)
@@ -36,9 +25,6 @@ except ImportError:                                                # pragma: no 
 
 from lv_hub_dev import DeviceError
 
-# ---------------------------------------------------------------------------
-# Colores de trazas (CH0 verde, CH1 amarillo, como un osciloscopio de banco)
-# ---------------------------------------------------------------------------
 C_CH = [QColor("#3cff5a"), QColor("#ffe23c"), QColor("#40c8ff"), QColor("#ff7ad9")]
 C_MARK = QColor("#ff9a2e")
 
@@ -97,15 +83,11 @@ QDial              { background:#cfcfcf; }
 """
 
 
-# ---------------------------------------------------------------------------
-# Formato
-# ---------------------------------------------------------------------------
 _PREF = [(1e9, "G"), (1e6, "M"), (1e3, "k"), (1.0, ""), (1e-3, "m"),
          (1e-6, "µ"), (1e-9, "n"), (1e-12, "p")]
 
 
 def eng(v, unit="", digits=4, sign=False):
-    """1234.5 -> '1.235 k' + unidad."""
     if v is None or isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
         return "----  " + unit
     a = abs(v)
@@ -124,12 +106,7 @@ def fmt_time(t):
     return eng(t, "s", 3)
 
 
-# ---------------------------------------------------------------------------
-# Hilo de adquisicion
-# ---------------------------------------------------------------------------
 class Runner(QThread):
-    """Corre fn(runner) en otro hilo. fn revisa runner.alive y entrega datos
-    con runner.post(obj) (llegan al hilo de la GUI por la senal 'posted')."""
     posted = Signal(object)
     failed = Signal(str)
 
@@ -146,13 +123,12 @@ class Runner(QThread):
             self.fn(self)
         except DeviceError as e:
             self.failed.emit(str(e))
-        except Exception as e:                                    # noqa: BLE001
+        except Exception as e:
             traceback.print_exc()
             self.failed.emit("Error inesperado: %s" % e)
 
 
 def sleep_while(r, seconds):
-    """time.sleep que se corta si el runner se detiene."""
     end = time.perf_counter() + seconds
     while r.alive:
         left = end - time.perf_counter()
@@ -161,9 +137,6 @@ def sleep_while(r, seconds):
         time.sleep(min(0.02, left))
 
 
-# ---------------------------------------------------------------------------
-# Widgets
-# ---------------------------------------------------------------------------
 def dspin(lo, hi, val, dec=2, suffix="", step=None):
     s = QDoubleSpinBox()
     s.setRange(lo, hi)
@@ -187,7 +160,6 @@ def ispin(lo, hi, val, suffix=""):
 
 
 def combo(items):
-    """items: lista de textos o de (dato, texto)."""
     c = QComboBox()
     for it in items:
         if isinstance(it, tuple):
@@ -252,7 +224,6 @@ class Led(QWidget):
 
 
 class Knob(QWidget):
-    """Perilla + casilla numerica, como los controles de ELVISmx."""
     valueChanged = Signal(float)
 
     def __init__(self, title, lo, hi, val, dec=2, suffix="", log=False):
@@ -317,14 +288,10 @@ class Knob(QWidget):
 
 
 def _clean(v, rng):
-    """Quita el ruido de punto flotante de una marca del eje (-2.7e-17 -> 0)."""
     span = abs(rng[1] - rng[0]) or 1.0
     return 0.0 if abs(v) < span * 1e-9 else round(v, 12)
 
 
-# ---------------------------------------------------------------------------
-# Grafica (pantalla del osciloscopio y demas)
-# ---------------------------------------------------------------------------
 class Plot(QWidget):
     def __init__(self, ticks=True, nx=10, ny=8):
         QWidget.__init__(self)
@@ -333,11 +300,11 @@ class Plot(QWidget):
         self.nx, self.ny = nx, ny
         self.logx = False
         self.ticks = ticks
-        self.scope_ticks = not ticks      # marcas finas en los ejes centrales
-        self.traces = []          # (xs, ys, QColor, dots)
-        self.hlines = []          # (y, QColor)
-        self.vlines = []          # (x, QColor)
-        self.overlay = []         # (QColor, texto) arriba a la izquierda
+        self.scope_ticks = not ticks
+        self.traces = []
+        self.hlines = []
+        self.vlines = []
+        self.overlay = []
         self.xfmt = lambda v: "%g" % v
         self.yfmt = lambda v: "%g" % v
         self.xlabel = ""
@@ -381,7 +348,6 @@ class Plot(QWidget):
         mid = QPen(QColor("#6a6a6a"), 1, Qt.DotLine)
         txt = QColor("#c8c8c8")
 
-        # --- rejilla vertical ---------------------------------------------
         xs_grid = []
         if self.logx:
             x0, x1 = self.xr
@@ -406,7 +372,6 @@ class Plot(QWidget):
                 p.setPen(txt)
                 s = self.xfmt(v)
                 p.drawText(QRectF(X - 40, R.bottom() + 2, 80, 16), Qt.AlignCenter, s)
-        # --- rejilla horizontal -------------------------------------------
         for i in range(self.ny + 1):
             v = _clean(self.yr[0] + (self.yr[1] - self.yr[0]) * i / self.ny, self.yr)
             Y = self._my(v, R)
@@ -417,7 +382,7 @@ class Plot(QWidget):
                 p.setPen(txt)
                 p.drawText(QRectF(0, Y - 8, ml - 6, 16),
                            Qt.AlignRight | Qt.AlignVCenter, self.yfmt(v))
-        if self.scope_ticks and not self.logx:   # marcas finas sobre los ejes centrales, como un scope
+        if self.scope_ticks and not self.logx:
             p.setPen(QPen(QColor("#6a6a6a"), 1))
             cx, cy = R.center().x(), R.center().y()
             for i in range(self.nx * 5 + 1):
@@ -478,13 +443,10 @@ class Plot(QWidget):
             y += 15
 
 
-# ---------------------------------------------------------------------------
-# Ventana base de un instrumento
-# ---------------------------------------------------------------------------
 class InstrumentWindow(QWidget):
     TITLE = "Instrumento"
     HELP = ""
-    MODES = True        # mostrar "Continuo / Una vez"
+    MODES = True
 
     def __init__(self, hub):
         QWidget.__init__(self)
@@ -518,7 +480,6 @@ class InstrumentWindow(QWidget):
         self.body.setObjectName("panel")
         root.addWidget(self.body, 1)
 
-        # --- Control del instrumento ---------------------------------------
         ctl, cf = group("Control del instrumento")
         self.lb_dev = QLabel("")
         cf.addWidget(QLabel("Dispositivo"), 0, 0)
@@ -560,7 +521,6 @@ class InstrumentWindow(QWidget):
         self.sync()
         self._buttons(False)
 
-    # --- para las subclases -----------------------------------------------
     def build(self):
         pass
 
@@ -571,7 +531,6 @@ class InstrumentWindow(QWidget):
         pass
 
     def on_start(self):
-        """Antes de arrancar el hilo. Devolver False cancela."""
         return True
 
     def on_stopped(self):
@@ -581,16 +540,13 @@ class InstrumentWindow(QWidget):
         return self.HELP
 
     def sync(self):
-        """Copia los controles a self.cfg (lo unico que lee el hilo)."""
         pass
 
-    # --- comun ------------------------------------------------------------
     @property
     def dev(self):
         return self.hub.dev
 
     def watch(self, *widgets):
-        """Cualquier cambio en estos controles vuelve a llamar sync()."""
         for w in widgets:
             if isinstance(w, QComboBox):
                 w.currentIndexChanged.connect(lambda *_a: self.sync())
@@ -619,8 +575,14 @@ class InstrumentWindow(QWidget):
             self.stop()
 
     def refresh_channels(self):
-        """La subclase llena sus combos de canales con self.dev.channels()."""
         pass
+
+    def vref_changed(self):
+        v = self.dev.vref
+        if getattr(self, "_seen_vref", None) == v:
+            return False
+        self._seen_vref = v
+        return True
 
     @staticmethod
     def fill(cb, items, keep=True):
@@ -703,9 +665,6 @@ class InstrumentWindow(QWidget):
             self.set_status("No se pudo guardar: %s" % e, "err")
 
 
-# ---------------------------------------------------------------------------
-# Iconos del launcher (dibujados, sin archivos)
-# ---------------------------------------------------------------------------
 def make_icon(kind, size=64):
     pm = QPixmap(size, size)
     pm.fill(Qt.transparent)

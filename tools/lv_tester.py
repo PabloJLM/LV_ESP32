@@ -1,30 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-lv_tester.py — LV_ESP32 v3
-Probador de comandos: botones + linea de comandos, con el MISMO protocolo que
-los VIs de LabVIEW (Flush -> Write -> Read; ver lv_wire.py).
-
-    Config\\python\\python.exe tools\\lv_tester.py                (ventana)
-    Config\\python\\python.exe tools\\lv_tester.py --port COM5    (conecta solo)
-    Config\\python\\python.exe tools\\lv_tester.py --port COM5 --cmd "do 0 1" --cmd "ai 2"
-                                                               (sin ventana)
-
-Linea de comandos (la ventana acepta lo mismo):
-    do 0 1            salida digital canal 0 = 1
-    di 3              entrada digital canal 3
-    ai 2              entrada analogica canal 2
-    ao 0 128          DAC canal 0
-    pwm 1 200         PWM canal 1, duty 0..255
-    servo 0 90        servo canal 0, 90 grados
-    neo 255 0 0       toda la tira en rojo
-    neopx 3 0 255 0   pixel 3 en verde
-    neoopt 1          cambia el pin de la tira (opcion 0 o 1)
-    lcd 0x27 0 0 Hola
-    id | ping
-    wsave MiRed clave | wconn | wstat | wdisc | ftpsave user clave | ftp 1
-    hex 01 00 01      bytes crudos (hex); la respuesta se lee segun el codigo
-"""
-
 import argparse
 import sys
 import os
@@ -34,7 +7,6 @@ import lv_wire as W
 
 
 def run_line(wire, line):
-    """Ejecuta una linea del probador. Devuelve Result o lanza ValueError."""
     parts = line.strip().split()
     if not parts:
         raise ValueError("vacio")
@@ -83,7 +55,6 @@ def describe(line, res):
             % (line, fmt_hex(res.tx), fmt_hex(res.rx), res.text, msg, res.ms)), ok
 
 
-# ---------------------------------------------------------------------------
 def cli(a):
     w = W.Wire(a.port, timeout=a.timeout, boot_delay=a.boot)
     bad = 0
@@ -102,7 +73,6 @@ def cli(a):
     return 1 if bad else 0
 
 
-# ---------------------------------------------------------------------------
 def gui(a):
     from PyQt5 import QtCore, QtWidgets, QtGui
     try:
@@ -121,7 +91,6 @@ def gui(a):
             self.spins = {}
             root = QtWidgets.QVBoxLayout(self)
 
-            # --- conexion ---------------------------------------------------
             top = QtWidgets.QHBoxLayout()
             self.port = QtWidgets.QComboBox()
             self.port.setEditable(True)
@@ -138,7 +107,6 @@ def gui(a):
             top.addWidget(self.info, 1)
             root.addLayout(top)
 
-            # --- botones + consola -----------------------------------------
             mid = QtWidgets.QHBoxLayout()
             root.addLayout(mid, 1)
             self.panel = QtWidgets.QVBoxLayout()
@@ -232,7 +200,6 @@ def gui(a):
                 self.port.setEditText(a.port)
                 QtCore.QTimer.singleShot(100, self.toggle)
 
-        # -- construccion --------------------------------------------------
         def rowspec(self, title, name, fields, btn):
             g = QtWidgets.QGroupBox(title)
             h = QtWidgets.QHBoxLayout(g)
@@ -268,7 +235,6 @@ def gui(a):
             if cur:
                 self.port.setEditText(cur)
 
-        # -- conexion ------------------------------------------------------
         def toggle(self):
             if self.wire:
                 self.wire.close()
@@ -306,7 +272,6 @@ def gui(a):
                     self.spins[name][0].setMaximum(max(cnt - 1, 0))
             self.log_add("Identidad: %s" % self.ident["raw"], "#555")
 
-        # -- envio ---------------------------------------------------------
         def log_add(self, txt, color=None):
             if color:
                 esc = (txt.replace("&", "&amp;").replace("<", "&lt;")
@@ -374,7 +339,7 @@ def gui(a):
     app = QtWidgets.QApplication(sys.argv)
     w = Win()
     w.show()
-    if a.shot:                                  # captura para revisar la ventana sin pantalla
+    if a.shot:
         QtCore.QTimer.singleShot(a.shot_ms, lambda: (w.grab().save(a.shot), app.quit()))
     return app.exec_()
 

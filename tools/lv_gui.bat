@@ -1,16 +1,4 @@
 @echo off
-REM ===========================================================================
-REM  lv_gui.bat — LV_ESP32
-REM  Punto de entrada unico. Se arregla solo sobre un clon limpio del repo:
-REM  si falta PyQt5 lo instala en el Python embebido del propio repositorio
-REM  (una sola vez, necesita internet). El flasheo usa las herramientas nativas
-REM  de Config\flashtools (esptool.exe, avrdude.exe, dfu-util.exe).
-REM
-REM  Desde LabVIEW (System Exec.vi, "wait until completion" = TRUE):
-REM     "<repo>\tools\lv_gui.bat"                 lanzador con las 2 herramientas
-REM     "<repo>\tools\lv_gui.bat" --tool flash    solo "Cargar firmware"
-REM     "<repo>\tools\lv_gui.bat" --tool online   solo "WiFi y FTP"
-REM ===========================================================================
 setlocal
 set "TOOLS=%~dp0"
 set "REPO=%TOOLS%.."
@@ -25,7 +13,6 @@ if not exist "%PY%" (
     exit /b 3
 )
 
-REM --- PyQt5: se instala una sola vez, dentro del repo ----------------------
 "%PY%" -c "import PyQt5" >nul 2>nul
 if errorlevel 1 (
     echo.

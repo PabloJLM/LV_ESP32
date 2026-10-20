@@ -1,16 +1,4 @@
 @echo off
-REM ===========================================================================
-REM  build_exe.bat - LV_ESP32
-REM  Arma dist\LV_Firmware\ : LV_Firmware.exe + herramientas nativas + binarios.
-REM
-REM  Se corre UNA vez en TU PC (Windows, con un Python normal instalado) cada vez
-REM  que cambie la GUI, una herramienta o un binario. Los usuarios NO necesitan
-REM  Python, PlatformIO ni ningun IDE: reciben la carpeta dist\LV_Firmware\.
-REM
-REM  Antes de correrlo:
-REM    - Config\flashtools\  con esptool, dfu-util y avrdude (ver su LEEME.md)
-REM    - firmware\bin\       con los binarios (ver firmware\COMPILAR.md)
-REM ===========================================================================
 setlocal
 set "TOOLS=%~dp0"
 set "REPO=%TOOLS%.."

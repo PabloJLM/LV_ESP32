@@ -1,10 +1,3 @@
-/*
- * lv_online.cpp — LV_ESP32   (solo se compila con -DLV_ONLINE)
- * Protocolo y pinout: ver lv_online.h
- *
- * Sin -DLV_ONLINE este archivo queda vacio, asi que arduino-cli puede
- * compilarlo para cualquier tarjeta sin problema.
- */
 #include "lv_online.h"
 
 #ifdef LV_ONLINE
@@ -16,12 +9,10 @@
 #include <SimpleFTPServer.h>
 
 #if __has_include(<esp_mac.h>)
-  #include <esp_mac.h>              /* arduino-esp32 3.x */
+  #include <esp_mac.h>
 #endif
 #include <esp_system.h>
 
-/* SimpleFTPServer decide SD o FFat al COMPILAR LA LIBRERIA, no este archivo.
-   Si esto falla es que faltaron las banderas del catalogo (ver lv_online.h). */
 #if !defined(STORAGE_TYPE) || (STORAGE_TYPE != STORAGE_SD)
   #error "Compila con -DDEFAULT_FTP_SERVER_NETWORK_TYPE_ESP32=6 -DDEFAULT_STORAGE_TYPE_ESP32=5"
 #endif
@@ -30,7 +21,7 @@ static Preferences prefs;
 #if defined(CONFIG_IDF_TARGET_ESP32)
 static SPIClass    sdSpi(VSPI);
 #else
-static SPIClass    sdSpi(FSPI);      /* ESP32-S3 (Nano ESP32) */
+static SPIClass    sdSpi(FSPI);
 #endif
 static FtpServer   ftp;
 
@@ -39,13 +30,10 @@ static uint8_t  fState = LV_F_OFF;
 static uint32_t wT0    = 0;
 static uint32_t sdMB   = 0;
 
-/* --- NVS ------------------------------------------------------------------ */
 static bool putStr(const char* key, const char* v) {
   if (!prefs.begin("lvonl", false)) return false;
   size_t w = prefs.putString(key, v);
   prefs.end();
-  /* putString devuelve 0 con cadena vacia: una clave WiFi vacia es valida
-     (red abierta), asi que solo es error si habia algo que escribir. */
   return (w == strlen(v));
 }
 
@@ -58,13 +46,10 @@ static String getStr(const char* key) {
   return s;
 }
 
-/* --- ADC2 / radio --------------------------------------------------------- */
 bool lv_radioActive() { return WiFi.getMode() != WIFI_OFF; }
 
-/* --- arranque / servicio -------------------------------------------------- */
 void lv_onlineBegin() {
-  /* El radio queda APAGADO: el ADC2 sigue util hasta que LabVIEW mande 0xC2. */
-  WiFi.persistent(false);          /* no escribir en flash por su cuenta */
+  WiFi.persistent(false);
   WiFi.mode(WIFI_OFF);
 }
 
@@ -73,18 +58,17 @@ void lv_onlineLoop() {
     if (WiFi.status() == WL_CONNECTED) {
       wState = LV_W_UP;
     } else if ((millis() - wT0) > LV_WIFI_TIMEOUT_MS) {
-      WiFi.disconnect(true);       /* deja de reintentar con una clave mala */
+      WiFi.disconnect(true);
       wState = LV_W_FAIL;
     }
   } else if (wState == LV_W_UP && WiFi.status() != WL_CONNECTED) {
-    wState = LV_W_CONNECTING;      /* se cayo: AutoReconnect lo intenta de nuevo */
+    wState = LV_W_CONNECTING;
     wT0 = millis();
   }
 
   if (fState == LV_F_ON && wState == LV_W_UP) ftp.handleFTP();
 }
 
-/* --- WiFi ----------------------------------------------------------------- */
 bool lv_wifiSaveCreds(const char* ssid, const char* pass) {
   if (strlen(ssid) == 0 || strlen(ssid) > LV_WIFI_SSID_MAX) return false;
   if (strlen(pass) > LV_WIFI_PASS_MAX) return false;
@@ -94,7 +78,7 @@ bool lv_wifiSaveCreds(const char* ssid, const char* pass) {
 bool lv_wifiConnect() {
   if (wState == LV_W_UP || wState == LV_W_CONNECTING) return true;
   String ssid = getStr("ws");
-  if (ssid.length() == 0) return false;          /* nada guardado */
+  if (ssid.length() == 0) return false;
   String pass = getStr("wp");
 
   WiFi.mode(WIFI_STA);
@@ -108,11 +92,10 @@ bool lv_wifiConnect() {
 void lv_wifiDisconnect() {
   lv_ftpSet(false);
   WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);             /* libera el ADC2 */
+  WiFi.mode(WIFI_OFF);
   wState = LV_W_OFF;
 }
 
-/* --- FTP + SD ------------------------------------------------------------- */
 bool lv_ftpSaveCreds(const char* user, const char* pass) {
   if (strlen(user) == 0 || strlen(user) > LV_FTP_USER_MAX) return false;
   if (strlen(pass) == 0 || strlen(pass) > LV_FTP_PASS_MAX) return false;
@@ -129,7 +112,7 @@ bool lv_ftpSet(bool on) {
   }
 
   if (fState == LV_F_ON) return true;
-  if (wState != LV_W_UP) return false;           /* sin red no hay FTP */
+  if (wState != LV_W_UP) return false;
 
   String user = getStr("fu");
   String pass = getStr("fp");
@@ -149,7 +132,6 @@ bool lv_ftpSet(bool on) {
   return true;
 }
 
-/* --- estado --------------------------------------------------------------- */
 void lv_onlineStatus(char* out, size_t n) {
   IPAddress ip = (wState == LV_W_UP) ? WiFi.localIP() : IPAddress(0, 0, 0, 0);
   int rssi = (wState == LV_W_UP) ? WiFi.RSSI() : 0;
@@ -160,9 +142,9 @@ void lv_onlineStatus(char* out, size_t n) {
 
 void lv_onlineMacStr(char* out) {
   uint8_t m[6] = {0};
-  esp_read_mac(m, ESP_MAC_WIFI_STA);   /* funciona aunque el radio este apagado */
+  esp_read_mac(m, ESP_MAC_WIFI_STA);
   snprintf(out, 18, "%02X:%02X:%02X:%02X:%02X:%02X",
            m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 
-#endif /* LV_ONLINE */
+#endif
