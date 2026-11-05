@@ -3,10 +3,16 @@ TOOLS="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(dirname "$TOOLS")"
 VENV="$REPO/.venv"
 
+# Un venv sin pip (p. ej. creado sin python3-venv) queda roto: se descarta.
+if [ -x "$VENV/bin/python" ] && ! "$VENV/bin/python" -m pip --version >/dev/null 2>&1; then
+    echo "El entorno $VENV esta incompleto (sin pip); recreandolo ..."
+    rm -rf "$VENV"
+fi
+
 if [ ! -x "$VENV/bin/python" ]; then
     command -v python3 >/dev/null 2>&1 || { echo "ERROR: falta python3 (sudo apt install python3 python3-venv)"; exit 3; }
     echo "Primera ejecucion: creando el entorno en $VENV ..."
-    python3 -m venv "$VENV" || { echo "ERROR: no se pudo crear el venv (sudo apt install python3-venv)"; exit 3; }
+    python3 -m venv "$VENV" || { rm -rf "$VENV"; echo "ERROR: no se pudo crear el venv (sudo apt install python3-venv)"; exit 3; }
 fi
 PY="$VENV/bin/python"
 
