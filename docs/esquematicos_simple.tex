@@ -1,0 +1,110 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1.6cm]{geometry}
+\usepackage[european]{circuitikz}
+\usepackage{booktabs}
+\pagestyle{empty}
+\tikzset{pin/.style={font=\scriptsize\ttfamily}}
+\newcommand{\ai}[1]{to[short,-o] (#1) node[right,pin]{AI}}
+\begin{document}
+\begin{center}{\Large\bfseries LV\_ESP32 Hub --- Circuitos (rango 15\,V)}\\
+\small $V_{ref}$ = 3.3\,V (ESP32, Nano ESP32, K8) o 5\,V (Uno, Nano). GND com\'un con la placa. Un cable de la punta negra a GND.\end{center}
+
+\begin{center}\small\begin{tabular}{lcc}\toprule
+ & 3.3\,V & 5\,V\\\midrule
+V DC 0--15\,V: $R_1$ / $R_2$ / sonda & 22\,k / 5.6\,k / 4.93 & 22\,k / 10\,k / 3.2\\
+V AC $\pm15$\,V: $C$ / $R_1$ / $R_b$ / sonda & 1\,$\mu$F / 43\,k / 10\,k / 9.6 & 1\,$\mu$F / 27\,k / 10\,k / 6.4\\
+Corriente: $R_{sh}$ (decenas de mA / 1\,A) & 10\,$\Omega$ / 1\,$\Omega$ & 10\,$\Omega$ / 1\,$\Omega$\\
+$\Omega$: $R_{ref}$ (1\,k--100\,k / decenas $\Omega$) & 10\,k / 1\,k & 10\,k / 1\,k\\
+DAC por PWM: $R$ / $C$ ($f_c=15.9$\,Hz) & 10\,k / 1\,$\mu$F & 10\,k / 1\,$\mu$F\\\bottomrule
+\end{tabular}\end{center}
+
+\noindent
+\begin{minipage}[t]{0.49\textwidth}\centering
+\textbf{1. Voltaje DC}\\[3pt]
+\begin{circuitikz}[scale=0.8,transform shape]
+\draw (0,0) node[left]{$V_{in}$} to[short,o-] (0.3,0) to[R=22\,k] (2.3,0) to[short,*-] (3.1,0) \ai{3.9,0};
+\draw (2.3,0) to[R,l_=5.6\,k] (2.3,-2) node[ground]{};
+\draw (3.1,0) to[C=100\,n] (3.1,-2) node[ground]{};
+\end{circuitikz}\\[-2pt]
+{\scriptsize $V_{in}=V_{AI}\cdot 4.93$; AI $\le 3.04$\,V a 15\,V}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}\centering
+\textbf{2. Voltaje AC}\\[3pt]
+\begin{circuitikz}[scale=0.8,transform shape]
+\draw (0,0) node[left]{$V_{in}$} to[short,o-] (0.2,0) to[C=1\,$\mu$] (1.9,0) to[R=43\,k] (3.5,0) to[short,*-] (4.3,0) \ai{5.0,0};
+\draw (3.5,0) to[R=10\,k] (3.5,1.8) node[vcc]{$V_{ref}$};
+\draw (3.5,0) to[R,l_=10\,k] (3.5,-1.8) node[ground]{};
+\draw (4.3,0) to[C=100\,n] (4.3,-1.8) node[ground]{};
+\end{circuitikz}\\[-2pt]
+{\scriptsize AI centrado en $V_{ref}/2$; $V_{in}=\Delta V_{AI}\cdot 9.6$}
+\end{minipage}
+
+\vspace{2pt}\noindent
+\begin{minipage}[t]{0.49\textwidth}\centering
+\textbf{3. Corriente DC}\\[3pt]
+\begin{circuitikz}[scale=0.8,transform shape]
+\draw (0,2.4) node[vcc]{$V_{fuente}$} to[generic,l=Carga] (0,0.8) to[short,*-] (0,0.6);
+\draw (0,0.8) to[R=$R_{sh}$] (0,-1.2) node[ground]{};
+\draw (0,0.8) to[short,*-] (1.0,0.8) \ai{1.8,0.8};
+\end{circuitikz}\\[-2pt]
+{\scriptsize $I=V_{AI}/R_{sh}$; $V_{AI}\le V_{ref}$}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}\centering
+\textbf{4. Resistencia y continuidad}\\[3pt]
+\begin{circuitikz}[scale=0.8,transform shape]
+\draw (0,2.2) node[vcc]{$V_{ref}$} to[R=$R_{ref}$] (0,0.6);
+\draw (0,0.6) to[short,*-] (0,0.5) to[R=$R_x$] (0,-1.5) node[ground]{};
+\draw (0,0.6) to[short,*-] (1.0,0.6) \ai{1.8,0.6};
+\end{circuitikz}\\[-2pt]
+{\scriptsize $R_x=R_{ref}\,V/(V_{ref}-V)$; continuidad: $R_{ref}=1$\,k, umbral 50\,$\Omega$}
+\end{minipage}
+
+\vspace{2pt}\noindent
+\begin{minipage}[t]{0.49\textwidth}\centering
+\textbf{5. DAC por PWM (placas sin DAC)}\\[3pt]
+\begin{circuitikz}[scale=0.8,transform shape]
+\draw (0,0) node[left,pin]{PWM} to[short,o-] (0.2,0) to[R=10\,k] (2.0,0) to[short,*-] (2.8,0) to[R=10\,k] (4.6,0) to[short,*-o] (5.4,0) node[right,pin]{OUT};
+\draw (2.0,0) to[C=1\,$\mu$] (2.0,-1.8) node[ground]{};
+\draw (4.6,0) to[C=1\,$\mu$] (4.6,-1.8) node[ground]{};
+\draw (2.0,0) to[short,*-o] (2.0,0.7) node[above,pin]{OUT 1 etapa};
+\end{circuitikz}\\[-2pt]
+{\scriptsize $V_{out}=V_{ref}\cdot duty$; 1 etapa $f_c=15.9$\,Hz, 2 etapas menos rizado}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}\centering
+\textbf{6. Salida con carga (seguidor)}\\[3pt]
+\begin{circuitikz}[scale=0.8,transform shape]
+\draw (0,0) node[left,pin]{PWM} to[short,o-] (0.2,0) to[R=10\,k] (2.0,0) to[short,*-] (2.6,0);
+\draw (2.0,0) to[C,l_=1\,$\mu$] (2.0,-1.8) node[ground]{};
+\node[op amp,noinv input up,anchor=+] (A) at (2.6,0) {};
+\coordinate (inv) at (A.-); \coordinate (oo) at (A.out);
+\draw (inv) -- (inv |- 0,-1.2) coordinate(f) -- (f -| oo) -- (oo);
+\draw (oo) to[short,*-o] ++(0.8,0) node[right,pin]{OUT};
+\end{circuitikz}\\[-2pt]
+{\scriptsize Op-amp rail-to-rail (MCP6002, LMV358) a $V_{ref}$}
+\end{minipage}
+
+\vspace{2pt}\noindent
+\begin{minipage}[t]{0.49\textwidth}\centering
+\textbf{7. Bode}\\[3pt]
+\begin{circuitikz}[scale=0.8,transform shape]
+\draw (0,0) node[left,pin]{Salida} to[short,o-*] (0.8,0) to[R=10\,k] (3.2,0) to[short,*-o] (4.2,0) node[right,pin]{AI Resp.};
+\draw (3.2,0) to[C=10\,$\mu$] (3.2,-1.8) node[ground]{};
+\draw (0.8,0) to[short,-o] (0.8,1.0) node[above,pin]{AI Est\'imulo};
+\end{circuitikz}\\[-2pt]
+{\scriptsize Circuito de prueba RC: $f_c=1.6$\,Hz}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}\centering
+\textbf{8. DigIn y DigOut}\\[3pt]
+\begin{circuitikz}[scale=0.8,transform shape]
+\draw (0,1.0) node[left,pin]{DI} to[short,o-*] (0.8,1.0) to[R=10\,k] (0.8,-0.8) node[ground]{};
+\draw (0.8,1.0) -- (0.8,1.8) to[normal open switch] (2.6,1.8) node[vcc]{$V_{ref}$};
+\draw (0,-2.2) node[left,pin]{DO} to[short,o-] (0.2,-2.2) to[R=330] (2.2,-2.2) to[leDo] (2.2,-3.9) node[ground]{};
+\end{circuitikz}\\[-2pt]
+{\scriptsize DI sin pull-up interno. DO: $\approx5$\,mA}
+\end{minipage}
+
+\vspace{2pt}
+\noindent\textbf{Protecci\'on (V DC y AC):} BAT54S en el nodo AI: un diodo a $V_{ref}$ y otro a GND. \textbf{Evitar} en ESP32: GPIO0, 2, 12, 15 con cargas que fuercen nivel al encender. Archivos LTspice: \texttt{docs/ltspice/*.asc}.
+\end{document}
