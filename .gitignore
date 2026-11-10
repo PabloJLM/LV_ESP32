@@ -1,16 +1,7 @@
-# ===========================================================================
-#  LV_ESP32 — el repositorio guarda FUENTES.
-#  El paquete que usan los alumnos se arma con tools/make_bundle.py y se
-#  publica en GitHub Releases, no aqui.
-# ===========================================================================
 
-# arduino-cli y el core de Arduino (~1 GB): ya no son parte del producto. Si los
-# usas para compilar los binarios, que se queden en tu PC y fuera de Git
 Config/arduino-cli/
 
-# Paquetes que instala lv_gui.bat dentro del Python embebido (PyQt5, esptool y
-# sus dependencias): no van en Git. Solo se conservan pip, setuptools, wheel,
-# packaging y pyserial, que son pequenos.
+
 Config/python/Lib/site-packages/*
 !Config/python/Lib/site-packages/pip/
 !Config/python/Lib/site-packages/pip-*/
@@ -30,33 +21,35 @@ Config/python/Scripts/*
 !Config/python/Scripts/wheel.exe
 !Config/python/Scripts/pyserial-*.exe
 
-# paquetes generados
+
 dist/
 
-# PlatformIO: compilaciones locales
+
 .pio/
 
-# Herramientas nativas de carga y binarios compilados: no van en Git. Van dentro
-# de dist\LV_Firmware\ y del ZIP (ver Config/flashtools/LEEME.md y
-# firmware/COMPILAR.md)
 Config/flashtools/**/*.exe
 Config/flashtools/**/*.dll
 Config/flashtools/**/*.conf
 !firmware/bin/.gitkeep
 
-# compilaciones del firmware
+
 firmware/build/
 
-# la wiki es otro repositorio (se clona aqui para editarla, no se versiona)
+
 LV_ESP32.wiki/
 
-# LabVIEW
+
 *.lvlps
 builds/
 
-# Python
+
 __pycache__/
 *.pyc
 
-# entorno virtual de lv_gui.sh (Linux/macOS)
+
 .venv/
+
+# LTspice
+docs/ltspice/*.raw
+docs/ltspice/*.log
+docs/ltspice/*.op.raw
