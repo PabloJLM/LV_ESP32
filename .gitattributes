@@ -4,4 +4,4 @@ Config/flashtools/** linguist-vendored
 *.sh text eol=lf
 *.vi linguist-language=LabVIEW
 Ejemplos/** linguist-documentation
-*.asc linguist-language=LTspice
+docs/ltspice/*.asc linguist-documentation
