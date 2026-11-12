@@ -53,3 +53,4 @@ __pycache__/
 docs/ltspice/*.raw
 docs/ltspice/*.log
 docs/ltspice/*.op.raw
+docs/ltspice/*.net
