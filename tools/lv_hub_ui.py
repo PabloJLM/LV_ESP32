@@ -24,62 +24,61 @@ except ImportError:
     QT_NAME = "PySide6"
 
 from lv_hub_dev import DeviceError
+from lv_hub_lang import T
 
-C_CH = [QColor("#3cff5a"), QColor("#ffe23c"), QColor("#40c8ff"), QColor("#ff7ad9")]
+C_CH = [QColor("#00ff40"), QColor("#c8ff28"), QColor("#40c8ff"), QColor("#ff7ad9")]
 C_MARK = QColor("#ff9a2e")
 
 QSS = """
-QWidget            { color:#f0f0f0; font-size:12px;
-                     font-family:"Segoe UI","Tahoma","DejaVu Sans",sans-serif; }
-QWidget#panel      { background:#3b3b3b; }
-QFrame#header      { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
-                         stop:0 #1c1c1c, stop:1 #2e2e2e);
-                     border-bottom:2px solid #6a8fc4; }
-QLabel#title       { font-size:18px; font-weight:bold; color:#ffffff; }
-QLabel#brand       { font-size:11px; color:#9fb6d8; }
-QLabel#status      { color:#d8d8d8; padding:2px 4px; }
-QLabel#status[kind="err"] { color:#ff8a80; }
-QLabel#status[kind="ok"]  { color:#9cff9c; }
+QWidget            { color:#1a1a1a; font-size:12px;
+                     font-family:"Tahoma","Segoe UI","DejaVu Sans",sans-serif; }
+QWidget#panel      { background:#d4d4d4; }
+QLabel#status      { color:#303030; padding:2px 4px; }
+QLabel#status[kind="err"] { color:#a01010; font-weight:bold; }
+QLabel#status[kind="ok"]  { color:#106a10; font-weight:bold; }
+QLabel#board       { background:#0a0a0a; color:#00ff40; border:2px solid;
+                     border-color:#707070 #ffffff #ffffff #707070;
+                     font-family:"Consolas","DejaVu Sans Mono","Courier New",monospace;
+                     font-size:13px; font-weight:bold; padding:4px 10px; }
 
-QGroupBox          { background:#d9d9d9; border:1px solid #808080; border-radius:3px;
-                     margin-top:18px; padding:8px 6px 6px 6px; font-weight:bold; }
+QGroupBox          { background:#e4e4e4; border:2px solid;
+                     border-color:#ffffff #8a8a8a #8a8a8a #ffffff;
+                     margin-top:18px; padding:8px 6px 6px 6px; }
 QGroupBox::title   { subcontrol-origin:margin; subcontrol-position:top left;
-                     left:6px; padding:0 3px; color:#f2f2f2; }
-QGroupBox QLabel, QGroupBox QCheckBox { color:#151515; font-weight:normal; }
-QGroupBox QLabel#hint { color:#4a4a4a; font-size:11px; }
+                     left:4px; padding:0 2px; color:#1a1a1a; font-weight:bold; }
+QGroupBox QLabel#hint, QLabel#hint { color:#4a4a4a; font-size:11px; }
 
 QComboBox, QDoubleSpinBox, QSpinBox {
-                     background:#ffffff; color:#111; border:1px solid #8a8a8a;
-                     padding:2px 4px; min-height:18px; font-weight:normal; }
+                     background:#ffffff; color:#111; border:2px solid;
+                     border-color:#808080 #f4f4f4 #f4f4f4 #808080;
+                     padding:2px 4px; min-height:18px; }
 QComboBox QAbstractItemView { background:#ffffff; color:#111;
-                     selection-background-color:#3c6fb8; selection-color:#fff; }
-QComboBox:disabled, QDoubleSpinBox:disabled, QSpinBox:disabled { color:#888; background:#eee; }
+                     selection-background-color:#1a7a1a; selection-color:#fff; }
+QComboBox:disabled, QDoubleSpinBox:disabled, QSpinBox:disabled { color:#888; background:#ececec; }
 
-QPushButton        { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
-                         stop:0 #fbfbfb, stop:1 #c9c9c9);
-                     color:#111; border:1px solid #6e6e6e; border-radius:3px;
-                     padding:4px 12px; font-weight:normal; }
-QPushButton:hover  { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
-                         stop:0 #ffffff, stop:1 #dadada); }
+QPushButton        { background:#dcdcdc; color:#111; border:2px solid;
+                     border-color:#ffffff #707070 #707070 #ffffff; padding:4px 12px; }
+QPushButton:hover  { background:#e8e8e8; }
 QPushButton:pressed, QPushButton:checked {
-                     background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
-                         stop:0 #4f86d6, stop:1 #2a5ca8);
-                     color:#ffffff; border:1px solid #1d3f75; }
-QPushButton:disabled { color:#9a9a9a; background:#d0d0d0; border:1px solid #a8a8a8; }
-QPushButton#run    { font-weight:bold; color:#0b5d12; min-width:70px; }
-QPushButton#stop   { font-weight:bold; color:#8a0c0c; min-width:70px; }
+                     background:#b8e6b8; border-color:#707070 #ffffff #ffffff #707070; }
+QPushButton:disabled { color:#999; }
+QPushButton#run    { font-weight:bold; color:#0a6a0a; min-width:70px; }
+QPushButton#stop   { font-weight:bold; color:#a00000; min-width:70px; }
 QPushButton#mode   { min-width:46px; min-height:30px; font-size:14px; font-weight:bold; }
 
-QLabel#lcd         { background:#000000; color:#3cff5a; border:2px solid #5a5a5a;
+QLabel#lcd         { background:#0a0a0a; color:#00ff40; border:3px solid;
+                     border-color:#707070 #ffffff #ffffff #707070;
                      font-family:"Consolas","DejaVu Sans Mono","Courier New",monospace;
                      font-size:46px; font-weight:bold; padding:6px 14px; }
-QLabel#lcdsmall    { background:#000000; color:#b8f5c4; border:1px solid #5a5a5a;
+QLabel#lcdsmall    { background:#0a0a0a; color:#7cff9a; border:2px solid;
+                     border-color:#707070 #ffffff #ffffff #707070;
                      font-family:"Consolas","DejaVu Sans Mono","Courier New",monospace;
                      font-size:12px; padding:3px 8px; }
-QLabel#readout     { background:#111111; color:#e8e8e8; border:1px solid #5a5a5a;
+QLabel#readout     { background:#0a0a0a; color:#00ff40; border:2px solid;
+                     border-color:#707070 #ffffff #ffffff #707070;
                      font-family:"Consolas","DejaVu Sans Mono","Courier New",monospace;
                      font-size:12px; padding:4px 8px; }
-QDial              { background:#cfcfcf; }
+QDial              { background:#c8c8c8; }
 """
 
 
@@ -125,7 +124,7 @@ class Runner(QThread):
             self.failed.emit(str(e))
         except Exception as e:
             traceback.print_exc()
-            self.failed.emit("Error inesperado: %s" % e)
+            self.failed.emit(T("Error inesperado: %s") % e)
 
 
 def sleep_while(r, seconds):
@@ -209,18 +208,22 @@ class Led(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         r = QRectF(2, 2, self.width() - 4, self.height() - 4)
-        g = QRadialGradient(r.center().x() - r.width() * 0.2,
-                            r.center().y() - r.height() * 0.2, r.width() * 0.7)
-        if self.on:
-            g.setColorAt(0, QColor("#ffffff"))
-            g.setColorAt(0.25, self.color.lighter(130))
-            g.setColorAt(1, self.color.darker(160))
-        else:
-            g.setColorAt(0, QColor("#6a6a6a"))
-            g.setColorAt(1, QColor("#1f1f1f"))
-        p.setBrush(QBrush(g))
-        p.setPen(QPen(QColor("#202020"), 1.2))
+        p.setBrush(QColor("#9a9a9a"))
+        p.setPen(QPen(QColor("#505050"), 1))
         p.drawEllipse(r)
+        k = r.adjusted(3, 3, -3, -3)
+        g = QRadialGradient(k.center().x() - k.width() * 0.2,
+                            k.center().y() - k.height() * 0.25, k.width() * 0.75)
+        if self.on:
+            g.setColorAt(0, QColor("#e8ffe8"))
+            g.setColorAt(0.35, self.color)
+            g.setColorAt(1, self.color.darker(170))
+        else:
+            g.setColorAt(0, QColor("#2f6a2f"))
+            g.setColorAt(1, QColor("#0a2a0a"))
+        p.setBrush(QBrush(g))
+        p.setPen(Qt.NoPen)
+        p.drawEllipse(k)
 
 
 class Knob(QWidget):
@@ -309,6 +312,11 @@ class Plot(QWidget):
         self.yfmt = lambda v: "%g" % v
         self.xlabel = ""
         self.ylabel = ""
+        self.c_frame = QColor("#d4d4d4")
+        self.c_screen = QColor("#000000")
+        self.c_text = QColor("#1a1a1a")
+        self.c_grid = QColor("#2e4a2e")
+        self.c_grid2 = QColor("#4f7a4f")
         self.setMinimumSize(320, 200)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
@@ -337,16 +345,18 @@ class Plot(QWidget):
         W, H = self.width(), self.height()
         ml = 58 if self.ticks else 4
         mb = (34 if self.xlabel else 22) if self.ticks else 4
-        p.fillRect(self.rect(), QColor("#202020"))
+        p.fillRect(self.rect(), self.c_frame)
         R = QRectF(ml, 4, W - ml - 8, H - mb - 4)
-        p.fillRect(R, QColor("#000000"))
+        p.fillRect(R, self.c_screen)
+        p.setPen(QPen(QColor("#707070"), 2))
+        p.drawRect(R.adjusted(-1, -1, 1, 1))
         small = QFont(self.font())
         small.setPointSizeF(max(7.0, small.pointSizeF() - 1.5))
         p.setFont(small)
 
-        dot = QPen(QColor("#3c3c3c"), 1, Qt.DotLine)
-        mid = QPen(QColor("#6a6a6a"), 1, Qt.DotLine)
-        txt = QColor("#c8c8c8")
+        dot = QPen(self.c_grid, 1, Qt.DotLine)
+        mid = QPen(self.c_grid2, 1, Qt.DotLine)
+        txt = self.c_text
 
         xs_grid = []
         if self.logx:
@@ -383,7 +393,7 @@ class Plot(QWidget):
                 p.drawText(QRectF(0, Y - 8, ml - 6, 16),
                            Qt.AlignRight | Qt.AlignVCenter, self.yfmt(v))
         if self.scope_ticks and not self.logx:
-            p.setPen(QPen(QColor("#6a6a6a"), 1))
+            p.setPen(QPen(self.c_grid2, 1))
             cx, cy = R.center().x(), R.center().y()
             for i in range(self.nx * 5 + 1):
                 X = R.left() + R.width() * i / (self.nx * 5)
@@ -459,34 +469,21 @@ class InstrumentWindow(QWidget):
         self.setWindowTitle("LV_ESP32 — " + self.TITLE)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 6)
+        root.setContentsMargins(0, 4, 0, 6)
         root.setSpacing(6)
-
-        head = QFrame()
-        head.setObjectName("header")
-        hl = QHBoxLayout(head)
-        hl.setContentsMargins(14, 8, 14, 8)
-        t = QLabel(self.TITLE)
-        t.setObjectName("title")
-        b = QLabel("LV_ESP32 Instrument Hub\nTesla Lab · Universidad Galileo")
-        b.setObjectName("brand")
-        b.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        hl.addWidget(t)
-        hl.addStretch(1)
-        hl.addWidget(b)
-        root.addWidget(head)
 
         self.body = QWidget()
         self.body.setObjectName("panel")
         root.addWidget(self.body, 1)
 
-        ctl, cf = group("Control del instrumento")
+        ctl, cf = group(T("Control del instrumento"))
         self.lb_dev = QLabel("")
-        cf.addWidget(QLabel("Dispositivo"), 0, 0)
+        self.lb_dev.setObjectName("board")
+        cf.addWidget(QLabel(T("Tarjeta")), 0, 0)
         cf.addWidget(self.lb_dev, 1, 0)
-        self.cb_mode = combo(["Continuo", "Una vez"])
+        self.cb_mode = combo([T("Continuo"), T("Una vez")])
         if self.MODES:
-            cf.addWidget(QLabel("Modo de adquisición"), 0, 1)
+            cf.addWidget(QLabel(T("Modo de adquisición")), 0, 1)
             cf.addWidget(self.cb_mode, 1, 1)
         cf.setColumnStretch(2, 1)
         self.extra = QHBoxLayout()
@@ -495,7 +492,7 @@ class InstrumentWindow(QWidget):
         self.btn_run.setObjectName("run")
         self.btn_stop = QPushButton("■  Stop")
         self.btn_stop.setObjectName("stop")
-        self.btn_help = QPushButton("Ayuda")
+        self.btn_help = QPushButton(T("Ayuda"))
         cf.addWidget(self.btn_run, 1, 4)
         cf.addWidget(self.btn_stop, 1, 5)
         cf.addWidget(self.btn_help, 1, 6)
@@ -567,8 +564,10 @@ class InstrumentWindow(QWidget):
 
     def device_changed(self):
         d = self.dev
-        self.lb_dev.setText(("%s  ·  %s" % (d.board, d.port)) if d.connected
-                            else "(sin conexión)")
+        self.lb_dev.setText(("%s  ·  %s" % (d.board_name, d.port)) if d.connected
+                            else T("(sin conexión)"))
+        self.setWindowTitle("LV_ESP32 — %s%s" % (
+            self.TITLE, ("  —  " + d.board_name) if d.connected else ""))
         self.refresh_channels()
         self.sync()
         if not d.connected:
@@ -612,7 +611,7 @@ class InstrumentWindow(QWidget):
         if self.running:
             return
         if not self.dev.connected:
-            self.set_status("Conecta una tarjeta desde el launcher.", "err")
+            self.set_status(T("Conecta una tarjeta desde el launcher."), "err")
             return
         self.sync()
         self._once = self.MODES and self.cb_mode.currentIndex() == 1
@@ -651,7 +650,7 @@ class InstrumentWindow(QWidget):
         import os
         default = os.path.join(os.path.expanduser("~"),
                                "%s_%s.csv" % (name, time.strftime("%Y%m%d_%H%M%S")))
-        path, _f = QFileDialog.getSaveFileName(self, "Guardar datos", default,
+        path, _f = QFileDialog.getSaveFileName(self, T("Guardar datos"), default,
                                                "CSV (*.csv)")
         if not path:
             return
@@ -660,9 +659,9 @@ class InstrumentWindow(QWidget):
                 w = csv.writer(fh)
                 w.writerow(header)
                 w.writerows(rows)
-            self.set_status("Guardado: %s  (%d filas)" % (path, len(rows)), "ok")
+            self.set_status(T("Guardado: %s  (%d filas)") % (path, len(rows)), "ok")
         except OSError as e:
-            self.set_status("No se pudo guardar: %s" % e, "err")
+            self.set_status(T("No se pudo guardar: %s") % e, "err")
 
 
 def make_icon(kind, size=64):
@@ -671,17 +670,7 @@ def make_icon(kind, size=64):
     p = QPainter(pm)
     p.setRenderHint(QPainter.Antialiasing)
     s = size / 64.0
-    g = QLinearGradient(0, 0, 0, size)
-    g.setColorAt(0, QColor("#5f8fd2"))
-    g.setColorAt(0.5, QColor("#2f5fa6"))
-    g.setColorAt(1, QColor("#1b3c70"))
-    p.setBrush(QBrush(g))
-    p.setPen(QPen(QColor("#0f2244"), 1.5))
-    p.drawRoundedRect(QRectF(2, 2, size - 4, size - 4), 9 * s, 9 * s)
-    p.setPen(QPen(QColor(255, 255, 255, 60), 1))
-    p.drawLine(QPointF(10 * s, 6 * s), QPointF(54 * s, 6 * s))
-
-    W = QPen(QColor("#ffffff"), 2.6 * s)
+    W = QPen(QColor("#2a2a2a"), 2.6 * s)
     W.setCapStyle(Qt.RoundCap)
     p.setPen(W)
     f = QFont()
@@ -693,19 +682,19 @@ def make_icon(kind, size=64):
         p.drawPolyline(QPolygonF(pts))
 
     if kind == "dmm":
-        p.setBrush(QColor("#0d1b0d"))
+        p.setBrush(Qt.NoBrush)
         p.drawRoundedRect(QRectF(12 * s, 14 * s, 40 * s, 20 * s), 3 * s, 3 * s)
         f.setPixelSize(int(14 * s))
         p.setFont(f)
-        p.setPen(QColor("#3cff5a"))
+        p.setPen(QColor("#2a2a2a"))
         p.drawText(QRectF(12 * s, 14 * s, 40 * s, 20 * s), Qt.AlignCenter, "8.88")
         p.setPen(W)
         p.setBrush(Qt.NoBrush)
         p.drawEllipse(QPointF(32 * s, 46 * s), 7 * s, 7 * s)
     elif kind == "scope":
-        p.setBrush(QColor("#0b0b0b"))
+        p.setBrush(Qt.NoBrush)
         p.drawRect(QRectF(11 * s, 13 * s, 42 * s, 34 * s))
-        p.setPen(QPen(QColor("#3cff5a"), 2.2 * s))
+        p.setPen(QPen(QColor("#0a8a1a"), 2.2 * s))
         wave(lambda u: math.sin(u * 4 * math.pi), 13, 51, 30, 10)
         p.setPen(W)
         p.drawLine(QPointF(24 * s, 52 * s), QPointF(40 * s, 52 * s))
@@ -729,14 +718,10 @@ def make_icon(kind, size=64):
         p.drawLine(QPointF(12 * s, 52 * s), QPointF(54 * s, 52 * s))
         p.drawPolyline(QPolygonF([QPointF(14 * s, 22 * s), QPointF(30 * s, 22 * s),
                                   QPointF(36 * s, 26 * s), QPointF(52 * s, 46 * s)]))
-    elif kind == "dsa":
-        p.drawLine(QPointF(12 * s, 52 * s), QPointF(54 * s, 52 * s))
-        for x, h in ((16, 10), (22, 32), (28, 14), (34, 8), (40, 20), (46, 6), (52, 4)):
-            p.drawLine(QPointF(x * s, 52 * s), QPointF(x * s, (52 - h) * s))
     elif kind in ("digin", "digout"):
         for i, on in enumerate((1, 0, 1, 1)):
-            p.setBrush(QColor("#3cff5a") if on else QColor("#1a3a1a"))
-            p.setPen(QPen(QColor("#ffffff"), 1.2 * s))
+            p.setBrush(QColor("#10c030") if on else QColor("#0a3a0a"))
+            p.setPen(QPen(QColor("#2a2a2a"), 1.4 * s))
             p.drawEllipse(QPointF((17 + i * 10) * s, 22 * s), 4 * s, 4 * s)
         p.setPen(W)
         if kind == "digin":
@@ -747,9 +732,5 @@ def make_icon(kind, size=64):
             p.drawLine(QPointF(32 * s, 34 * s), QPointF(32 * s, 50 * s))
             p.drawLine(QPointF(26 * s, 44 * s), QPointF(32 * s, 50 * s))
             p.drawLine(QPointF(38 * s, 44 * s), QPointF(32 * s, 50 * s))
-    elif kind == "iv":
-        p.drawLine(QPointF(12 * s, 12 * s), QPointF(12 * s, 52 * s))
-        p.drawLine(QPointF(12 * s, 52 * s), QPointF(54 * s, 52 * s))
-        wave(lambda u: (math.exp(7 * u) - 1) / (math.exp(7) - 1) * 2 - 1, 14, 50, 34, 16)
     p.end()
     return pm

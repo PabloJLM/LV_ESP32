@@ -1,5 +1,4 @@
 import argparse
-import cmath
 import collections
 import math
 import os
@@ -9,6 +8,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from lv_hub_dev import Device, DeviceError, SimDevice
+from lv_hub_lang import LANGS, T
+import lv_hub_lang
 from lv_hub_ui import (C_CH, C_MARK, QSS, QApplication, QButtonGroup,
                        QCheckBox, QColor, QFrame, QGridLayout, QHBoxLayout,
                        QIcon, QLabel, QPushButton, QSize, QSizePolicy, QToolButton, QVBoxLayout, QWidget, Qt, QTimer, Runner,
@@ -88,20 +89,6 @@ def sine_fit(ts, vs, f):
     return math.hypot(a, b), math.atan2(b, a), cc
 
 
-def fft(x):
-    n = len(x)
-    if n <= 1:
-        return list(x)
-    ev = fft(x[0::2])
-    od = fft(x[1::2])
-    out = [0j] * n
-    for k in range(n // 2):
-        t = cmath.exp(-2j * math.pi * k / n) * od[k]
-        out[k] = ev[k] + t
-        out[k + n // 2] = ev[k] - t
-    return out
-
-
 def nice_step(span, n=8):
     raw = span / float(n)
     e = 10 ** math.floor(math.log10(raw))
@@ -128,18 +115,18 @@ def ai_items(dev):
 
 
 class DMM(InstrumentWindow):
-    TITLE = "Multímetro digital (DMM)"
-    MODES_LIST = [("vdc", "V⎓", "Voltaje DC"),
-                  ("vac", "V~", "Voltaje AC (RMS)"),
-                  ("adc", "A⎓", "Corriente DC (shunt)"),
-                  ("ohm", "Ω", "Resistencia"),
-                  ("cont", "•)))", "Continuidad")]
+    TITLE = T("Multímetro digital (DMM)")
+    MODES_LIST = [("vdc", "V⎓", T("Voltaje DC")),
+                  ("vac", "V~", T("Voltaje AC (RMS)")),
+                  ("adc", "A⎓", T("Corriente DC (shunt)")),
+                  ("ohm", "Ω", T("Resistencia")),
+                  ("cont", "•)))", T("Continuidad"))]
 
     def build(self):
         lay = QVBoxLayout(self.body)
         lay.setContentsMargins(8, 4, 8, 0)
 
-        disp, df = group("Pantalla")
+        disp, df = group(T("Pantalla"))
         self.lcd = QLabel("----")
         self.lcd.setObjectName("lcd")
         self.lcd.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -156,7 +143,7 @@ class DMM(InstrumentWindow):
         lay.addWidget(disp)
 
         mid = QHBoxLayout()
-        g, f = group("Configuración de medición")
+        g, f = group(T("Configuración de medición"))
         self.bg = QButtonGroup(self)
         mrow = QHBoxLayout()
         for i, (key, sym, tip) in enumerate(self.MODES_LIST):
@@ -170,26 +157,26 @@ class DMM(InstrumentWindow):
         self.bg.button(0).setChecked(True)
         f.addLayout(mrow, 0, 0, 1, 2)
         self.cb_ch = combo([])
-        row(f, 1, "Canal (rojo)", self.cb_ch)
-        self.sp_avg = ispin(1, 1000, 25, "muestras")
-        row(f, 2, "Promedio", self.sp_avg)
-        self.btn_null = QPushButton("Null (relativo)")
+        row(f, 1, T("Canal (rojo)"), self.cb_ch)
+        self.sp_avg = ispin(1, 1000, 25, T("muestras"))
+        row(f, 2, T("Promedio"), self.sp_avg)
+        self.btn_null = QPushButton(T("Null (relativo)"))
         self.btn_null.setCheckable(True)
         f.addWidget(self.btn_null, 3, 0, 1, 2)
         mid.addWidget(g)
 
-        g2, f2 = group("Ajustes")
+        g2, f2 = group(T("Ajustes"))
         self.sp_fac = dspin(0.001, 1000, 1.0, 3, "×")
         self.sp_rref = dspin(1, 10e6, 10000, 0, "Ω", 100)
         self.sp_shunt = dspin(0.001, 100000, 1.0, 3, "Ω")
         self.sp_cont = dspin(1, 1000, 50, 0, "Ω")
-        row(f2, 0, "Factor de sonda", self.sp_fac)
-        row(f2, 1, "R referencia (Ω)", self.sp_rref)
-        row(f2, 2, "R shunt (A)", self.sp_shunt)
-        row(f2, 3, "Umbral continuidad", self.sp_cont)
+        row(f2, 0, T("Factor de sonda"), self.sp_fac)
+        row(f2, 1, T("R referencia (Ω)"), self.sp_rref)
+        row(f2, 2, T("R shunt (A)"), self.sp_shunt)
+        row(f2, 3, T("Umbral continuidad"), self.sp_cont)
         mid.addWidget(g2)
 
-        g3, f3 = group("Conexiones")
+        g3, f3 = group(T("Conexiones"))
         self.lb_wire = hint("")
         self.lb_wire.setMinimumWidth(270)
         f3.addWidget(self.lb_wire, 0, 0)
@@ -232,25 +219,25 @@ class DMM(InstrumentWindow):
         vref = d.vref
         m = self.mode()
         txt = {
-            "vdc": "Punta roja → %s\nPunta negra → GND\n\nRango 0 a %.1f V. Para tensiones "
+            "vdc": T("Punta roja → %s\nPunta negra → GND\n\nRango 0 a %.1f V. Para tensiones "
                    "mayores usa un divisor y escribe su relación en 'Factor de sonda' "
-                   "(p. ej. 10 kΩ + 1 kΩ → 11×)." % (pin, vref),
-            "vac": "Punta roja → %s\nPunta negra → GND\n\nMide el RMS de la parte alterna. "
+                   "(p. ej. 10 kΩ + 1 kΩ → 11×).") % (pin, vref),
+            "vac": T("Punta roja → %s\nPunta negra → GND\n\nMide el RMS de la parte alterna. "
                    "La señal debe quedar entre 0 y %.1f V: móntala sobre un nivel DC "
-                   "(divisor + capacitor)." % (pin, vref),
-            "adc": "Shunt en serie con la carga, del lado de GND.\n%s mide la caída del "
-                   "shunt.\n\nI = V / Rshunt" % pin,
-            "ohm": "Divisor:\n%.1f V → R referencia → nodo → Rx → GND\nnodo → %s\n\n"
-                   "Rx = Rref·V / (%.1f − V). Usa una Rref del orden de Rx." % (vref, pin, vref),
-            "cont": "Mismo divisor que Ω (%.1f V → Rref → nodo → Rx → GND, nodo → %s).\n"
-                    "Pita si R < umbral." % (vref, pin),
+                   "(divisor + capacitor).") % (pin, vref),
+            "adc": T("Shunt en serie con la carga, del lado de GND.\n%s mide la caída del "
+                   "shunt.\n\nI = V / Rshunt") % pin,
+            "ohm": T("Divisor:\n%.1f V → R referencia → nodo → Rx → GND\nnodo → %s\n\n"
+                   "Rx = Rref·V / (%.1f − V). Usa una Rref del orden de Rx.") % (vref, pin, vref),
+            "cont": T("Mismo divisor que Ω (%.1f V → Rref → nodo → Rx → GND, nodo → %s).\n"
+                    "Pita si R < umbral.") % (vref, pin),
         }[m]
         self.lb_wire.setText(txt)
         self.lb_mode.setText(dict((k, t) for k, _s, t in self.MODES_LIST)[m])
 
     def on_start(self):
         self.mm = [None, None]
-        self.set_status("Midiendo...", "")
+        self.set_status(T("Midiendo..."), "")
 
     def work(self, r):
         dev = self.dev
@@ -270,9 +257,9 @@ class DMM(InstrumentWindow):
 
     def on_data(self, st):
         if st is None:
-            self.lcd.setText("No disp.")
-            self.set_status("El canal no respondió (ADC2 ocupado por el WiFi o canal "
-                            "inválido).", "err")
+            self.lcd.setText(T("No disp."))
+            self.set_status(T("El canal no respondió (ADC2 ocupado por el WiFi o canal "
+                            "inválido)."), "err")
             return
         m = self.mode()
         vref = self.dev.vref
@@ -307,7 +294,7 @@ class DMM(InstrumentWindow):
             lo, hi = self.mm
             self.mm = [val if lo is None else min(lo, val), val if hi is None else max(hi, val)]
         unit = {"vdc": "V", "vac": "V", "adc": "A"}.get(m, "Ω")
-        self.lb_stats.setText("Mín %s   Máx %s   (%d muestras, σ %s)" % (
+        self.lb_stats.setText(T("Mín %s   Máx %s   (%d muestras, σ %s)") % (
             eng(self.mm[0], unit, 4), eng(self.mm[1], unit, 4), st["n"],
             eng(st["std"], "V", 2)))
         if self.btn_null.isChecked():
@@ -319,7 +306,7 @@ VDIV = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0]
 
 
 class Scope(InstrumentWindow):
-    TITLE = "Osciloscopio (Scope)"
+    TITLE = T("Osciloscopio (Scope)")
 
     def build(self):
         lay = QHBoxLayout(self.body)
@@ -342,47 +329,47 @@ class Scope(InstrumentWindow):
         right = QVBoxLayout()
         self.chw = []
         for k in range(2):
-            g, f = group("Canal %d" % k)
-            en = QCheckBox("Habilitado")
+            g, f = group(T("Canal %d") % k)
+            en = QCheckBox(T("Habilitado"))
             en.setChecked(k == 0)
             en.setStyleSheet("QCheckBox{color:%s; font-weight:bold;}" %
-                             QColor(C_CH[k]).darker(170).name())
+                             QColor(C_CH[k]).darker(220).name())
             src = combo([])
-            probe = combo([(1.0, "1x"), (10.0, "10x"), (11.0, "11x (divisor 10k/1k)")])
+            probe = combo([(1.0, "1x"), (10.0, "10x"), (11.0, T("11x (divisor 10k/1k)"))])
             coup = combo([("DC", "DC"), ("AC", "AC")])
             vdiv = combo([(v, eng(v, "V", 2) + "/div") for v in VDIV])
             vdiv.setCurrentIndex(VDIV.index(0.5))
             pos = dspin(-4, 4, 0.0 if k else -3.0, 1, "div", 0.5)
             f.addWidget(en, 0, 0, 1, 2)
-            row(f, 1, "Fuente", src)
-            row(f, 2, "Sonda", probe)
-            row(f, 3, "Acoplamiento", coup)
-            row(f, 4, "Escala", vdiv)
-            row(f, 5, "Posición vertical", pos)
+            row(f, 1, T("Fuente"), src)
+            row(f, 2, T("Sonda"), probe)
+            row(f, 3, T("Acoplamiento"), coup)
+            row(f, 4, T("Escala"), vdiv)
+            row(f, 5, T("Posición vertical"), pos)
             self.chw.append({"en": en, "src": src, "probe": probe, "coup": coup,
                              "vdiv": vdiv, "pos": pos})
             self.watch(en, src, probe, coup, vdiv, pos)
             right.addWidget(g)
 
         bottom = QHBoxLayout()
-        g, f = group("Base de tiempo")
+        g, f = group(T("Base de tiempo"))
         self.cb_tdiv = combo([(t, fmt_time(t) + "/div") for t in TDIV])
         self.cb_tdiv.setCurrentIndex(TDIV.index(0.1))
-        row(f, 0, "Tiempo/div", self.cb_tdiv)
+        row(f, 0, T("Tiempo/div"), self.cb_tdiv)
         bottom.addWidget(g)
 
-        g, f = group("Disparo (trigger)")
-        self.cb_ttype = combo([("imm", "Inmediato"), ("edge", "Flanco")])
-        self.cb_tsrc = combo([(0, "Canal 0"), (1, "Canal 1")])
-        self.cb_slope = combo([(1, "Subida  ↗"), (-1, "Bajada  ↘")])
+        g, f = group(T("Disparo (trigger)"))
+        self.cb_ttype = combo([("imm", T("Inmediato")), ("edge", T("Flanco"))])
+        self.cb_tsrc = combo([(0, T("Canal 0")), (1, T("Canal 1"))])
+        self.cb_slope = combo([(1, T("Subida  ↗")), (-1, T("Bajada  ↘"))])
         self.sp_level = dspin(-50, 50, 1.65, 2, "V", 0.05)
-        f.addWidget(QLabel("Tipo"), 0, 0)
+        f.addWidget(QLabel(T("Tipo")), 0, 0)
         f.addWidget(self.cb_ttype, 0, 1)
-        f.addWidget(QLabel("Fuente"), 0, 2)
+        f.addWidget(QLabel(T("Fuente")), 0, 2)
         f.addWidget(self.cb_tsrc, 0, 3)
-        f.addWidget(QLabel("Pendiente"), 1, 0)
+        f.addWidget(QLabel(T("Pendiente")), 1, 0)
         f.addWidget(self.cb_slope, 1, 1)
-        f.addWidget(QLabel("Nivel"), 1, 2)
+        f.addWidget(QLabel(T("Nivel")), 1, 2)
         f.addWidget(self.sp_level, 1, 3)
         bottom.addWidget(g, 1)
         left.addLayout(bottom)
@@ -390,7 +377,7 @@ class Scope(InstrumentWindow):
         lay.addLayout(right)
 
         self.watch(self.cb_tdiv, self.cb_ttype, self.cb_tsrc, self.cb_slope, self.sp_level)
-        self.btn_auto = QPushButton("Autoescala")
+        self.btn_auto = QPushButton(T("Autoescala"))
         self.btn_log = QPushButton("Log")
         self.extra.addWidget(self.btn_auto)
         self.extra.addWidget(self.btn_log)
@@ -426,7 +413,7 @@ class Scope(InstrumentWindow):
 
     def on_start(self):
         self.frame = None
-        self.set_status("Adquiriendo...", "")
+        self.set_status(T("Adquiriendo..."), "")
 
     def work(self, r):
         dev = self.dev
@@ -499,21 +486,21 @@ class Scope(InstrumentWindow):
                     break
             if tref is None:
                 if self.frame is None:
-                    self.set_status("Esperando disparo… (nivel %s, %s)" %
+                    self.set_status(T("Esperando disparo… (nivel %s, %s)") %
                                     (eng(lvl, "V", 3), self.cb_slope.currentText()), "")
                 return
-            status = "Disparado"
+            status = T("Disparado")
         else:
             if now < win and self.once:
-                self.set_status("Llenando la pantalla... %.0f %%" % (100 * now / win), "")
+                self.set_status(T("Llenando la pantalla... %.0f %%") % (100 * now / win), "")
             tref = now - win
-            status = "Inmediato"
+            status = T("Inmediato")
         frame = []
         for pts in proc:
             fr = [(t - tref, v) for t, v in pts if -pre - win * 0.02 <= t - tref <= win - pre + win * 0.02]
             frame.append(fr)
         self.frame = (frame, pre, win)
-        self.set_status("%s  ·  %.0f muestras/s por canal" % (status, self.rate), "")
+        self.set_status(T("%s  ·  %.0f muestras/s por canal") % (status, self.rate), "")
         self.render()
         if self.once and (edge or now >= win):
             self.stop()
@@ -530,7 +517,7 @@ class Scope(InstrumentWindow):
         for k, fr in enumerate(frame):
             w = self.chw[k]
             if not w["en"].isChecked():
-                self.lb_meas[k].setText("Canal %d: apagado" % k)
+                self.lb_meas[k].setText(T("Canal %d: apagado") % k)
                 continue
             vd = w["vdiv"].currentData()
             pos = w["pos"].value()
@@ -542,7 +529,7 @@ class Scope(InstrumentWindow):
             if vs:
                 f = freq_of(ts, vs)
                 self.lb_meas[k].setText(
-                    "CH%d   RMS %s   Freq %s\n       Vp-p %s   Media %s" % (
+                    T("CH%d   RMS %s   Freq %s\n       Vp-p %s   Media %s") % (
                         k, eng(rms(vs), "V", 3), eng(f, "Hz", 4) if f else "----",
                         eng(max(vs) - min(vs), "V", 3), eng(mean(vs), "V", 3)))
             if self.cb_ttype.currentData() == "edge" and self.cb_tsrc.currentData() == k:
@@ -557,7 +544,7 @@ class Scope(InstrumentWindow):
     def autoscale(self):
         bufs = self.bufs
         if not any(bufs):
-            self.set_status("Primero presiona Run para tener datos.", "err")
+            self.set_status(T("Primero presiona Run para tener datos."), "err")
             return
         fbest = None
         for k, b in enumerate(bufs):
@@ -585,11 +572,11 @@ class Scope(InstrumentWindow):
             td = next((x for x in TDIV if 10 * x >= 2.5 / fbest), TDIV[-1])
             self.cb_tdiv.setCurrentIndex(TDIV.index(td))
             self.cb_ttype.setCurrentIndex(1)
-        self.set_status("Autoescala aplicada" + (" (%s)" % eng(fbest, "Hz", 3) if fbest else ""), "ok")
+        self.set_status(T("Autoescala aplicada") + (" (%s)" % eng(fbest, "Hz", 3) if fbest else ""), "ok")
 
     def log(self):
         if self.frame is None:
-            self.set_status("No hay datos que guardar.", "err")
+            self.set_status(T("No hay datos que guardar."), "err")
             return
         frame = self.frame[0]
         n = max(len(f) for f in frame)
@@ -613,29 +600,29 @@ def wave(shape, ph, duty=0.5):
 
 
 class FGen(InstrumentWindow):
-    TITLE = "Generador de funciones (FGEN)"
+    TITLE = T("Generador de funciones (FGEN)")
     MODES = False
-    SHAPES = [("sine", "∿  Senoidal"), ("tri", "⋀  Triangular"),
-              ("square", "⊓  Cuadrada"), ("saw", "⩘  Diente de sierra")]
+    SHAPES = [("sine", T("∿  Senoidal")), ("tri", T("⋀  Triangular")),
+              ("square", T("⊓  Cuadrada")), ("saw", T("⩘  Diente de sierra"))]
 
     def build(self):
         lay = QHBoxLayout(self.body)
         lay.setContentsMargins(8, 4, 8, 0)
         left = QVBoxLayout()
-        g, f = group("Señal de salida (2 periodos)")
+        g, f = group(T("Señal de salida (2 periodos)"))
         self.plot = Plot()
         self.plot.setMinimumSize(420, 260)
         self.plot.xfmt = lambda v: eng(v, "s", 2)
         self.plot.yfmt = lambda v: "%.1f V" % v
         f.addWidget(self.plot, 0, 0)
         left.addWidget(g, 1)
-        self.lb_rate = QLabel("Detenido")
+        self.lb_rate = QLabel(T("Detenido"))
         self.lb_rate.setObjectName("readout")
         left.addWidget(self.lb_rate)
         lay.addLayout(left, 1)
 
         right = QVBoxLayout()
-        g, f = group("Forma de onda")
+        g, f = group(T("Forma de onda"))
         self.bg = QButtonGroup(self)
         for i, (k, t) in enumerate(self.SHAPES):
             b = QPushButton(t)
@@ -647,37 +634,37 @@ class FGen(InstrumentWindow):
         self.bg.buttonClicked.connect(lambda *_a: self.sync())
         right.addWidget(g)
 
-        g, f = group("Parámetros")
+        g, f = group(T("Parámetros"))
         kn = QHBoxLayout()
-        self.k_f = Knob("Frecuencia", 0.01, 100.0, 1.0, 3, "Hz", log=True)
-        self.k_a = Knob("Amplitud", 0.0, 3.3, 2.0, 2, "Vpp")
-        self.k_o = Knob("Offset DC", 0.0, 3.3, 1.65, 2, "V")
+        self.k_f = Knob(T("Frecuencia"), 0.01, 100.0, 1.0, 3, "Hz", log=True)
+        self.k_a = Knob(T("Amplitud"), 0.0, 3.3, 2.0, 2, "Vpp")
+        self.k_o = Knob(T("Offset DC"), 0.0, 3.3, 1.65, 2, "V")
         for k in (self.k_f, self.k_a, self.k_o):
             kn.addWidget(k)
         f.addLayout(kn, 0, 0, 1, 2)
         self.sp_duty = dspin(1, 99, 50, 0, "%", 5)
-        row(f, 1, "Ciclo de trabajo (cuadrada)", self.sp_duty)
+        row(f, 1, T("Ciclo de trabajo (cuadrada)"), self.sp_duty)
         right.addWidget(g)
 
-        g, f = group("Salida")
+        g, f = group(T("Salida"))
         self.cb_out = combo([])
-        row(f, 0, "Canal", self.cb_out)
-        f.addWidget(hint("Al detener, la salida vuelve a 0 V. Por PWM la señal sale "
-                         "como ciclo de trabajo de 1 kHz: pon un filtro RC (10 kΩ + 10 µF)."),
+        row(f, 0, T("Canal"), self.cb_out)
+        f.addWidget(hint(T("Al detener, la salida vuelve a 0 V. Por PWM la señal sale "
+                         "como ciclo de trabajo de 1 kHz: pon un filtro RC (10 kΩ + 1 µF).")),
                     1, 0, 1, 2)
         right.addWidget(g)
 
-        g, f = group("Barrido de frecuencia")
-        self.ck_sw = QCheckBox("Barrido activado")
+        g, f = group(T("Barrido de frecuencia"))
+        self.ck_sw = QCheckBox(T("Barrido activado"))
         self.sp_f0 = dspin(0.01, 100, 0.5, 2, "Hz")
         self.sp_f1 = dspin(0.01, 100, 5.0, 2, "Hz")
         self.sp_fs = dspin(0.01, 50, 0.5, 2, "Hz")
         self.sp_ti = dspin(0.1, 60, 2.0, 1, "s")
         f.addWidget(self.ck_sw, 0, 0, 1, 2)
-        row(f, 1, "Inicio", self.sp_f0)
-        row(f, 2, "Fin", self.sp_f1)
-        row(f, 3, "Paso", self.sp_fs)
-        row(f, 4, "Intervalo", self.sp_ti)
+        row(f, 1, T("Inicio"), self.sp_f0)
+        row(f, 2, T("Fin"), self.sp_f1)
+        row(f, 3, T("Paso"), self.sp_fs)
+        row(f, 4, T("Intervalo"), self.sp_ti)
         right.addWidget(g)
         right.addStretch(1)
         lay.addLayout(right)
@@ -719,14 +706,14 @@ class FGen(InstrumentWindow):
         t, ph, f, v = self.live
         c = self.cfg
         ph = (ph + f * (perf() - t)) % 1.0
-        T = 2.0 / f
+        span = 2.0 / f
         n = 400
-        xs = [T * i / n for i in range(n + 1)]
-        ys = [self.value(c, (ph - (T - x) * f) % 1.0) for x in xs]
-        self.plot.xr = (0, T)
+        xs = [span * i / n for i in range(n + 1)]
+        ys = [self.value(c, (ph - (span - x) * f) % 1.0) for x in xs]
+        self.plot.xr = (0, span)
         self.plot.yr = (0, c["vmax"])
         self.plot.hlines = [(c["o"], C_MARK)]
-        self.plot.overlay = [(C_CH[0], "Salida %s   f %s" % (eng(v, "V", 3), eng(f, "Hz", 3)))]
+        self.plot.overlay = [(C_CH[0], T("Salida %s   f %s") % (eng(v, "V", 3), eng(f, "Hz", 3)))]
         self.plot.set_traces([(xs, ys, C_CH[0]), ([xs[-1]], [v], C_MARK, True)])
 
     def preview(self):
@@ -735,11 +722,11 @@ class FGen(InstrumentWindow):
         self.plot.overlay = []
         c = self.cfg
         f = c["f"]
-        T = 2.0 / f
+        span = 2.0 / f
         n = 400
-        xs = [T * i / n for i in range(n + 1)]
+        xs = [span * i / n for i in range(n + 1)]
         ys = [self.value(c, (x * f) % 1.0) for x in xs]
-        self.plot.xr = (0, T)
+        self.plot.xr = (0, span)
         self.plot.yr = (0, c["vmax"])
         self.plot.ny = 6 if c["vmax"] < 4 else 5
         self.plot.hlines = [(c["o"], C_MARK)]
@@ -747,18 +734,18 @@ class FGen(InstrumentWindow):
 
     def on_start(self):
         if not self.cfg["out"]:
-            self.set_status("Esta tarjeta no tiene salida analógica ni PWM.", "err")
+            self.set_status(T("Esta tarjeta no tiene salida analógica ni PWM."), "err")
             return False
         self.cb_out.setEnabled(False)
         self.live = None
         self.anim.start()
-        self.set_status("Generando en %s" % self.cfg["out"], "ok")
+        self.set_status(T("Generando en %s") % self.cfg["out"], "ok")
 
     def on_stopped(self):
         self.anim.stop()
         self.live = None
         self.cb_out.setEnabled(True)
-        self.lb_rate.setText("Detenido (salida en 0 V)")
+        self.lb_rate.setText(T("Detenido (salida en 0 V)"))
         self.preview()
 
     def work(self, r):
@@ -802,17 +789,17 @@ class FGen(InstrumentWindow):
     def on_data(self, obj):
         rate, f = obj
         lim = rate / 10.0
-        self.lb_rate.setText("f actual %s   ·   %.0f actualizaciones/s   ·   "
-                             "máx. recomendada %s" % (eng(f, "Hz", 3), rate, eng(lim, "Hz", 2)))
+        self.lb_rate.setText(T("f actual %s   ·   %.0f actualizaciones/s   ·   "
+                             "máx. recomendada %s") % (eng(f, "Hz", 3), rate, eng(lim, "Hz", 2)))
         if f > lim:
-            self.set_status("La frecuencia supera ~1/10 de las actualizaciones por "
-                            "segundo: la forma de onda sale escalonada.", "err")
+            self.set_status(T("La frecuencia supera ~1/10 de las actualizaciones por "
+                            "segundo: la forma de onda sale escalonada."), "err")
         else:
-            self.set_status("Generando en %s" % self.cfg["out"], "ok")
+            self.set_status(T("Generando en %s") % self.cfg["out"], "ok")
 
 
 class VPS(InstrumentWindow):
-    TITLE = "Fuente de alimentación variable (VPS)"
+    TITLE = T("Fuente de alimentación variable (VPS)")
     MODES = False
 
     def build(self):
@@ -820,31 +807,31 @@ class VPS(InstrumentWindow):
         lay.setContentsMargins(8, 4, 8, 0)
         top = QHBoxLayout()
         self.sup = []
-        for k, name in enumerate(("Fuente A", "Fuente B")):
+        for k, name in enumerate((T("Fuente A"), T("Fuente B"))):
             g, f = group(name)
             out = combo([])
-            kn = Knob("Tensión", 0.0, 3.3, 1.0 if k == 0 else 2.0, 2, "V")
+            kn = Knob(T("Tensión"), 0.0, 3.3, 1.0 if k == 0 else 2.0, 2, "V")
             lcd = QLabel("0.00 V")
             lcd.setObjectName("lcd")
             lcd.setAlignment(Qt.AlignCenter)
             lcd.setStyleSheet("font-size:30px;")
-            row(f, 0, "Salida", out)
+            row(f, 0, T("Salida"), out)
             f.addWidget(kn, 1, 0, 1, 2, Qt.AlignHCenter)
             f.addWidget(lcd, 2, 0, 1, 2)
             self.sup.append({"out": out, "knob": kn, "lcd": lcd})
             self.watch(out, kn)
             top.addWidget(g)
         lay.addLayout(top)
-        g, f = group("Notas")
-        f.addWidget(hint("No es una fuente de potencia: el DAC y el PWM entregan pocos "
+        g, f = group(T("Notas"))
+        f.addWidget(hint(T("No es una fuente de potencia: el DAC y el PWM entregan pocos "
                          "mA. Para alimentar una carga pon un seguidor con op-amp o un "
                          "transistor. El DAC y el PWM son de 8 bits (256 pasos de 0 a Vref). "
-                         "Al presionar Stop las salidas vuelven a 0 V."), 0, 0)
+                         "Al presionar Stop las salidas vuelven a 0 V.")), 0, 0)
         lay.addWidget(g)
         lay.addStretch(1)
 
     def refresh_channels(self):
-        items = [(None, "— apagada —")] + self.dev.outputs()
+        items = [(None, T("— apagada —"))] + self.dev.outputs()
         for k, s in enumerate(self.sup):
             self.fill(s["out"], items)
             if s["out"].currentData() is None and s["out"].count() > 1 + k:
@@ -857,20 +844,20 @@ class VPS(InstrumentWindow):
     def on_start(self):
         keys = [k for k, _v in self.cfg["s"] if k]
         if not keys:
-            self.set_status("Elige al menos una salida.", "err")
+            self.set_status(T("Elige al menos una salida."), "err")
             return False
         if len(set(keys)) != len(keys):
-            self.set_status("Las dos fuentes no pueden usar la misma salida.", "err")
+            self.set_status(T("Las dos fuentes no pueden usar la misma salida."), "err")
             return False
         for s in self.sup:
             s["out"].setEnabled(False)
-        self.set_status("Salidas activas", "ok")
+        self.set_status(T("Salidas activas"), "ok")
 
     def on_stopped(self):
         for s in self.sup:
             s["out"].setEnabled(True)
             s["lcd"].setText("0.00 V")
-        self.set_status("Salidas en 0 V", "")
+        self.set_status(T("Salidas en 0 V"), "")
 
     def work(self, r):
         dev = self.dev
@@ -899,25 +886,25 @@ class VPS(InstrumentWindow):
 
 
 class DigOut(InstrumentWindow):
-    TITLE = "Escritor digital (DigOut)"
-    PATTERNS = [("manual", "Manual"), ("ramp", "Rampa (cuenta binaria)"),
-                ("alt", "Alternado 1/0"), ("walk", "Caminar un 1")]
+    TITLE = T("Escritor digital (DigOut)")
+    PATTERNS = [("manual", "Manual"), ("ramp", T("Rampa (cuenta binaria)")),
+                ("alt", T("Alternado 1/0")), ("walk", T("Caminar un 1"))]
 
     def build(self):
         lay = QVBoxLayout(self.body)
         lay.setContentsMargins(8, 4, 8, 0)
-        self.g_lines, self.f_lines = group("Líneas")
+        self.g_lines, self.f_lines = group(T("Líneas"))
         lay.addWidget(self.g_lines)
         mid = QHBoxLayout()
-        g, f = group("Patrón")
+        g, f = group(T("Patrón"))
         self.cb_pat = combo(self.PATTERNS)
         self.sp_rate = dspin(0.1, 50, 2.0, 1, "Hz")
-        row(f, 0, "Patrón", self.cb_pat)
-        row(f, 1, "Velocidad", self.sp_rate)
-        f.addWidget(hint("En 'Una vez' los patrones dan una sola vuelta. En Manual, "
-                         "con Run activo cada interruptor se aplica al instante."), 2, 0, 1, 2)
-        mid.addWidget(g)
-        g, f = group("Valor")
+        row(f, 0, T("Patrón"), self.cb_pat)
+        row(f, 1, T("Velocidad"), self.sp_rate)
+        f.addWidget(hint(T("En 'Una vez' los patrones dan una sola vuelta. En Manual, "
+                         "con Run activo cada interruptor se aplica al instante.")), 2, 0, 1, 2)
+        mid.addWidget(g, 1)
+        g, f = group(T("Valor"))
         self.lb_val = QLabel("0")
         self.lb_val.setObjectName("lcd")
         self.lb_val.setStyleSheet("font-size:26px;")
@@ -935,7 +922,7 @@ class DigOut(InstrumentWindow):
         self.lines = []
         n = self.dev.n["do"] if self.dev.connected else 0
         for i in range(n):
-            led = Led("#ff4a3a")
+            led = Led("#00ff40")
             sw = QPushButton("OFF")
             sw.setCheckable(True)
             sw.setMinimumWidth(64)
@@ -947,7 +934,7 @@ class DigOut(InstrumentWindow):
             self.f_lines.addWidget(lab, 2, i)
             self.lines.append({"sw": sw, "led": led, "lab": lab})
         if not n:
-            lab = QLabel("(conecta una tarjeta)")
+            lab = QLabel(T("(conecta una tarjeta)"))
             self.f_lines.addWidget(lab, 0, 0)
             self.lines.append({"sw": lab, "led": QLabel(), "lab": QLabel()})
 
@@ -1004,24 +991,24 @@ class DigOut(InstrumentWindow):
 
 
 class DigIn(InstrumentWindow):
-    TITLE = "Lector digital (DigIn)"
+    TITLE = T("Lector digital (DigIn)")
 
     def build(self):
         lay = QVBoxLayout(self.body)
         lay.setContentsMargins(8, 4, 8, 0)
-        self.g_lines, self.f_lines = group("Líneas")
+        self.g_lines, self.f_lines = group(T("Líneas"))
         lay.addWidget(self.g_lines)
         mid = QHBoxLayout()
-        g, f = group("Valor")
+        g, f = group(T("Valor"))
         self.lb_val = QLabel("----")
         self.lb_val.setObjectName("lcd")
         self.lb_val.setStyleSheet("font-size:26px;")
         f.addWidget(self.lb_val, 0, 0)
         mid.addWidget(g, 1)
-        g, f = group("Notas")
-        f.addWidget(hint("Entradas sin pull-up: una línea al aire lee cualquier cosa. "
+        g, f = group(T("Notas"))
+        f.addWidget(hint(T("Entradas sin pull-up: una línea al aire lee cualquier cosa. "
                          "Las marcadas como AI también son entradas analógicas; leerlas "
-                         "aquí las pasa a modo digital."), 0, 0)
+                         "aquí las pasa a modo digital.")), 0, 0)
         mid.addWidget(g, 1)
         lay.addLayout(mid)
         lay.addStretch(1)
@@ -1034,7 +1021,7 @@ class DigIn(InstrumentWindow):
         self.leds = []
         n = self.dev.n["di"] if self.dev.connected else 0
         for i in range(n):
-            led = Led("#36ff4c", 26)
+            led = Led("#00ff40", 26)
             lab = QLabel("DI%d\n%s" % (i, self.dev.pin("di", i)))
             lab.setAlignment(Qt.AlignCenter)
             self.f_lines.addWidget(led, 0, i, Qt.AlignHCenter)
@@ -1061,7 +1048,7 @@ class DigIn(InstrumentWindow):
 
 
 class Bode(InstrumentWindow):
-    TITLE = "Analizador de Bode"
+    TITLE = T("Analizador de Bode")
     MODES = False
 
     def build(self):
@@ -1074,9 +1061,9 @@ class Bode(InstrumentWindow):
             p.logx = True
             p.xfmt = lambda v: eng(v, "Hz", 1).replace(".0 ", " ")
             p.setMinimumSize(560, 210)
-        self.p_mag.ylabel = "Magnitud"
-        self.p_ph.ylabel = "Fase (°)"
-        self.p_ph.xlabel = "Frecuencia"
+        self.p_mag.ylabel = T("Magnitud")
+        self.p_ph.ylabel = T("Fase (°)")
+        self.p_ph.xlabel = T("Frecuencia")
         self.p_ph.yfmt = lambda v: "%d°" % v
         left.addWidget(self.p_mag, 1)
         left.addWidget(self.p_ph, 1)
@@ -1086,36 +1073,36 @@ class Bode(InstrumentWindow):
         lay.addLayout(left, 1)
 
         right = QVBoxLayout()
-        g, f = group("Estímulo")
+        g, f = group(T("Estímulo"))
         self.cb_out = combo([])
         self.sp_amp = dspin(0.05, 5, 1.5, 2, "Vpp")
         self.sp_off = dspin(0, 5, 1.65, 2, "V")
-        row(f, 0, "Salida", self.cb_out)
-        row(f, 1, "Amplitud", self.sp_amp)
+        row(f, 0, T("Salida"), self.cb_out)
+        row(f, 1, T("Amplitud"), self.sp_amp)
         row(f, 2, "Offset", self.sp_off)
         right.addWidget(g)
-        g, f = group("Medición")
+        g, f = group(T("Medición"))
         self.cb_in = combo([])
         self.cb_resp = combo([])
-        row(f, 0, "Estímulo (entrada)", self.cb_in)
-        row(f, 1, "Respuesta (salida)", self.cb_resp)
+        row(f, 0, T("Estímulo (entrada)"), self.cb_in)
+        row(f, 1, T("Respuesta (salida)"), self.cb_resp)
         right.addWidget(g)
-        g, f = group("Barrido")
+        g, f = group(T("Barrido"))
         self.sp_f0 = dspin(0.01, 100, 0.2, 2, "Hz")
         self.sp_f1 = dspin(0.01, 100, 15, 2, "Hz")
-        self.sp_ppd = ispin(1, 20, 5, "pts/déc")
-        self.sp_cyc = ispin(1, 20, 3, "ciclos")
-        self.cb_scale = combo([("db", "dB"), ("lin", "Lineal (V/V)")])
-        row(f, 0, "Inicio", self.sp_f0)
-        row(f, 1, "Fin", self.sp_f1)
-        row(f, 2, "Resolución", self.sp_ppd)
-        row(f, 3, "Ciclos por punto", self.sp_cyc)
-        row(f, 4, "Escala", self.cb_scale)
+        self.sp_ppd = ispin(1, 20, 5, T("pts/déc"))
+        self.sp_cyc = ispin(1, 20, 3, T("ciclos"))
+        self.cb_scale = combo([("db", "dB"), ("lin", T("Lineal (V/V)"))])
+        row(f, 0, T("Inicio"), self.sp_f0)
+        row(f, 1, T("Fin"), self.sp_f1)
+        row(f, 2, T("Resolución"), self.sp_ppd)
+        row(f, 3, T("Ciclos por punto"), self.sp_cyc)
+        row(f, 4, T("Escala"), self.cb_scale)
         right.addWidget(g)
-        right.addWidget(hint("Conecta la salida elegida a la entrada del circuito y a "
+        right.addWidget(hint(T("Conecta la salida elegida a la entrada del circuito y a "
                              "'Estímulo'; la salida del circuito a 'Respuesta'. Con "
                              "muestreo por software el límite práctico es ~20 Hz: usa "
-                             "RC grandes (p. ej. 10 kΩ + 10 µF → fc ≈ 1.6 Hz)."))
+                             "RC grandes (p. ej. 10 kΩ + 10 µF → fc ≈ 1.6 Hz).")))
         right.addStretch(1)
         lay.addLayout(right)
         self.watch(self.cb_out, self.sp_amp, self.sp_off, self.cb_in, self.cb_resp,
@@ -1157,12 +1144,12 @@ class Bode(InstrumentWindow):
     def on_start(self):
         c = self.cfg
         if not c["out"] or c["ci"] is None or c["co"] is None:
-            self.set_status("Hace falta una salida y dos entradas analógicas.", "err")
+            self.set_status(T("Hace falta una salida y dos entradas analógicas."), "err")
             return False
         self.pts = []
         self.render()
         total = sum((1 + c["cyc"]) / f for f in self.freqs())
-        self.set_status("Barriendo %d puntos (~%s)..." % (len(self.freqs()), fmt_time(total)), "")
+        self.set_status(T("Barriendo %d puntos (~%s)...") % (len(self.freqs()), fmt_time(total)), "")
 
     def work(self, r):
         dev = self.dev
@@ -1210,25 +1197,25 @@ class Bode(InstrumentWindow):
 
     def on_data(self, obj):
         if obj[0] == "limit":
-            self.set_status("Se detuvo en %s: solo %.1f muestras por ciclo. Es el "
-                            "límite de este método." % (eng(obj[1], "Hz", 3), obj[2]), "err")
+            self.set_status(T("Se detuvo en %s: solo %.1f muestras por ciclo. Es el "
+                            "límite de este método.") % (eng(obj[1], "Hz", 3), obj[2]), "err")
             return
         if obj[0] == "noin":
-            self.set_status("No hay señal en el canal de estímulo a %s: revisa la "
-                            "conexión." % eng(obj[1], "Hz", 3), "err")
+            self.set_status(T("No hay señal en el canal de estímulo a %s: revisa la "
+                            "conexión.") % eng(obj[1], "Hz", 3), "err")
             return
         _k, f, g, ph, ai_, ao_, spc, i = obj
         self.pts.append((f, g, ph))
-        self.lb_pt.setText("f %s   |H| %.3f (%.2f dB)   fase %.1f°   Ain %s  Aout %s   "
-                           "%.0f muestras/ciclo" % (eng(f, "Hz", 3), g,
+        self.lb_pt.setText(T("f %s   |H| %.3f (%.2f dB)   fase %.1f°   Ain %s  Aout %s   "
+                           "%.0f muestras/ciclo") % (eng(f, "Hz", 3), g,
                                                      20 * math.log10(max(g, 1e-9)), ph,
                                                      eng(ai_, "V", 3), eng(ao_, "V", 3), spc))
-        self.set_status("Punto %d de %d" % (i, len(self.freqs())), "")
+        self.set_status(T("Punto %d de %d") % (i, len(self.freqs())), "")
         self.render()
 
     def on_stopped(self):
         if self.pts and self.lb_status.property("kind") != "err":
-            self.set_status("Barrido terminado (%d puntos)" % len(self.pts), "ok")
+            self.set_status(T("Barrido terminado (%d puntos)") % len(self.pts), "ok")
 
     def render(self):
         c = self.cfg or {}
@@ -1252,310 +1239,21 @@ class Bode(InstrumentWindow):
 
     def log(self):
         if not self.pts:
-            self.set_status("No hay datos que guardar.", "err")
+            self.set_status(T("No hay datos que guardar."), "err")
             return
-        self.save_csv(["f (Hz)", "|H| (V/V)", "|H| (dB)", "fase (grados)"],
+        self.save_csv(["f (Hz)", "|H| (V/V)", "|H| (dB)", T("fase (grados)")],
                       [["%.5g" % f, "%.5f" % g, "%.3f" % (20 * math.log10(max(g, 1e-9))),
                         "%.2f" % ph] for f, g, ph in self.pts], "bode")
 
 
-class DSA(InstrumentWindow):
-    TITLE = "Analizador dinámico de señales (DSA)"
-
-    def build(self):
-        lay = QHBoxLayout(self.body)
-        lay.setContentsMargins(8, 4, 8, 0)
-        left = QVBoxLayout()
-        self.p_t = Plot()
-        self.p_t.setMinimumSize(560, 170)
-        self.p_t.xfmt = lambda v: eng(v, "s", 2)
-        self.p_t.yfmt = lambda v: "%.2f V" % v
-        self.p_t.ny = 4
-        self.p_f = Plot()
-        self.p_f.setMinimumSize(560, 260)
-        self.p_f.xfmt = lambda v: eng(v, "Hz", 2)
-        self.p_f.xlabel = "Frecuencia"
-        left.addWidget(self.p_t, 2)
-        left.addWidget(self.p_f, 3)
-        self.lb_meas = QLabel("")
-        self.lb_meas.setObjectName("readout")
-        left.addWidget(self.lb_meas)
-        lay.addLayout(left, 1)
-
-        right = QVBoxLayout()
-        g, f = group("Entrada")
-        self.cb_src = combo([])
-        row(f, 0, "Fuente", self.cb_src)
-        right.addWidget(g)
-        g, f = group("Configuración FFT")
-        self.cb_n = combo([(n, "%d muestras" % n) for n in (128, 256, 512, 1024)])
-        self.cb_n.setCurrentIndex(1)
-        self.cb_win = combo([("hann", "Hanning"), ("none", "Ninguna (rectangular)")])
-        self.cb_unit = combo([("db", "dBV rms"), ("lin", "V rms (lineal)")])
-        self.ck_dc = QCheckBox("Quitar DC")
-        self.ck_dc.setChecked(True)
-        row(f, 0, "Tamaño", self.cb_n)
-        row(f, 1, "Ventana", self.cb_win)
-        row(f, 2, "Unidades", self.cb_unit)
-        f.addWidget(self.ck_dc, 3, 0, 1, 2)
-        right.addWidget(g)
-        right.addWidget(hint("La frecuencia de muestreo la pone el USB (cientos de S/s); "
-                             "la FFT se calcula sobre la señal remuestreada a paso "
-                             "uniforme. El rango útil es hasta fs/2."))
-        right.addStretch(1)
-        lay.addLayout(right)
-        self.watch(self.cb_src, self.cb_n)
-        for w in (self.cb_win, self.cb_unit):
-            w.currentIndexChanged.connect(lambda *_a: self.render())
-        self.ck_dc.toggled.connect(lambda *_a: self.render())
-        self.raw = None
-
-    def refresh_channels(self):
-        self.fill(self.cb_src, ai_items(self.dev))
-        if self.cb_src.count() > 2 and self.cb_src.currentIndex() == 0 and self.dev.simulated:
-            self.cb_src.setCurrentIndex(2)
-
-    def sync(self):
-        self.cfg = {"src": self.cb_src.currentData() or 0, "n": self.cb_n.currentData()}
-
-    def on_start(self):
-        self.set_status("Adquiriendo %d muestras..." % self.cfg["n"], "")
-
-    def work(self, r):
-        dev = self.dev
-        while r.alive:
-            c = self.cfg
-            ts, vs = [], []
-            t0 = perf()
-            while r.alive and len(vs) < c["n"]:
-                ta = perf()
-                v = dev.ai(c["src"])
-                if v is not None:
-                    ts.append((ta + perf()) / 2 - t0)
-                    vs.append(v)
-            if len(vs) == c["n"]:
-                r.post((ts, vs))
-            if self.once:
-                return
-
-    def on_data(self, obj):
-        self.raw = obj
-        self.render()
-
-    def render(self):
-        if not self.raw:
-            return
-        ts, vs = self.raw
-        n = len(vs)
-        T = ts[-1] - ts[0]
-        if T <= 0:
-            return
-        fs = (n - 1) / T
-        u, j = [], 0
-        for i in range(n):
-            t = ts[0] + i / fs
-            while j < n - 2 and ts[j + 1] < t:
-                j += 1
-            t1, t2 = ts[j], ts[j + 1]
-            a = (t - t1) / (t2 - t1) if t2 > t1 else 0.0
-            u.append(vs[j] + a * (vs[j + 1] - vs[j]))
-        m = mean(u)
-        x = [v - m for v in u] if self.ck_dc.isChecked() else list(u)
-        if self.cb_win.currentData() == "hann":
-            w = [0.5 - 0.5 * math.cos(2 * math.pi * i / (n - 1)) for i in range(n)]
-        else:
-            w = [1.0] * n
-        sw = sum(w)
-        X = fft([x[i] * w[i] for i in range(n)])
-        half = n // 2
-        mag = [abs(X[0]) / sw] + [abs(X[k]) * 2 / sw / math.sqrt(2) for k in range(1, half + 1)]
-        fr = [k * fs / n for k in range(half + 1)]
-        kpk = max(range(1, half + 1), key=lambda k: mag[k])
-        db = self.cb_unit.currentData() == "db"
-        ys = [20 * math.log10(max(v, 1e-6)) for v in mag] if db else mag
-        self.p_f.xr = (0, fs / 2)
-        if db:
-            hi = math.ceil(max(ys) / 10.0) * 10 + 10
-            self.p_f.yr = (hi - 100, hi)
-            self.p_f.ny = 10
-            self.p_f.yfmt = lambda v: "%d dBV" % v
-        else:
-            lo, hi, nn = nice_range(0, max(ys) * 1.1 or 1e-3, 6, zero=True)
-            self.p_f.yr = (lo, hi)
-            self.p_f.ny = nn
-            self.p_f.yfmt = lambda v: eng(v, "V", 2)
-        self.p_f.vlines = [(fr[kpk], C_MARK)]
-        self.p_f.set_traces([(fr, ys, C_CH[0])])
-        rel = [t - ts[0] for t in ts]
-        self.p_t.xr = (0, rel[-1])
-        lo, hi, nn = nice_range(min(vs), max(vs), 4)
-        self.p_t.yr = (lo, hi)
-        self.p_t.ny = nn
-        self.p_t.set_traces([(rel, vs, C_CH[1])])
-        self.lb_meas.setText("fs %s   ·   resolución %s   ·   pico %s  %s   ·   "
-                             "RMS total %s" % (
-                                 eng(fs, "S/s", 3), eng(fs / n, "Hz", 3),
-                                 eng(fr[kpk], "Hz", 4),
-                                 ("%.1f dBV" % ys[kpk]) if db else eng(mag[kpk], "V", 3),
-                                 eng(rms([v - m for v in u]), "V", 3)))
-        self.set_status("%d muestras en %s" % (n, fmt_time(T)), "")
-
-
-class IV(InstrumentWindow):
-    TITLE = "Analizador corriente-voltaje 2 hilos (2-Wire)"
-
-    def build(self):
-        lay = QHBoxLayout(self.body)
-        lay.setContentsMargins(8, 4, 8, 0)
-        left = QVBoxLayout()
-        self.plot = Plot()
-        self.plot.setMinimumSize(560, 380)
-        self.plot.xlabel = "Voltaje en el dispositivo (V)"
-        self.plot.ylabel = "Corriente (mA)"
-        self.plot.xfmt = lambda v: "%.2f" % v
-        self.plot.yfmt = lambda v: "%.3g" % v
-        left.addWidget(self.plot, 1)
-        self.lb_pt = QLabel("")
-        self.lb_pt.setObjectName("readout")
-        left.addWidget(self.lb_pt)
-        lay.addLayout(left, 1)
-
-        right = QVBoxLayout()
-        g, f = group("Barrido de voltaje")
-        self.cb_out = combo([])
-        self.sp_v0 = dspin(0, 5, 0.0, 2, "V")
-        self.sp_v1 = dspin(0, 5, 3.3, 2, "V")
-        self.sp_n = ispin(2, 256, 60, "pasos")
-        self.sp_dt = ispin(0, 2000, 15, "ms")
-        row(f, 0, "Salida", self.cb_out)
-        row(f, 1, "Inicio", self.sp_v0)
-        row(f, 2, "Fin", self.sp_v1)
-        row(f, 3, "Pasos", self.sp_n)
-        row(f, 4, "Espera por punto", self.sp_dt)
-        right.addWidget(g)
-        g, f = group("Circuito")
-        self.sp_r = dspin(1, 1e6, 1000, 0, "Ω", 100)
-        self.cb_node = combo([])
-        self.cb_srcm = combo([])
-        row(f, 0, "R en serie", self.sp_r)
-        row(f, 1, "AI nodo (+ del DUT)", self.cb_node)
-        row(f, 2, "AI fuente", self.cb_srcm)
-        right.addWidget(g)
-        right.addWidget(hint("Salida → R serie → nodo → dispositivo (ánodo) → GND.\n"
-                             "AI nodo mide el voltaje del dispositivo. I = (Vfuente − Vnodo)/R.\n"
-                             "'AI fuente' es opcional: si mides la salida real con otro AI "
-                             "la corriente sale más exacta (necesario con PWM + RC)."))
-        right.addStretch(1)
-        lay.addLayout(right)
-        self.watch(self.cb_out, self.sp_v0, self.sp_v1, self.sp_n, self.sp_dt, self.sp_r,
-                   self.cb_node, self.cb_srcm)
-        self.btn_log = QPushButton("Log")
-        self.extra.addWidget(self.btn_log)
-        self.btn_log.clicked.connect(self.log)
-        self.pts = []
-        self.render()
-
-    def refresh_channels(self):
-        self.fill(self.cb_out, self.dev.outputs())
-        items = ai_items(self.dev)
-        self.fill(self.cb_node, items)
-        if self.dev.simulated and self.cb_node.count() > 3:
-            self.cb_node.setCurrentIndex(3)
-        self.fill(self.cb_srcm, [(None, "— valor programado —")] + items)
-        v = self.dev.vref
-        self.sp_v0.setMaximum(v)
-        self.sp_v1.setMaximum(v)
-        if self.vref_changed():
-            self.sp_v1.setValue(v)
-
-    def sync(self):
-        self.cfg = {"out": self.cb_out.currentData(), "v0": self.sp_v0.value(),
-                    "v1": self.sp_v1.value(), "n": self.sp_n.value(),
-                    "dt": self.sp_dt.value() / 1000.0, "r": self.sp_r.value(),
-                    "node": self.cb_node.currentData(), "srcm": self.cb_srcm.currentData()}
-
-    def on_start(self):
-        c = self.cfg
-        if not c["out"] or c["node"] is None:
-            self.set_status("Hace falta una salida y una entrada analógica.", "err")
-            return False
-        self.set_status("Barriendo...", "")
-
-    def work(self, r):
-        dev = self.dev
-        c = dict(self.cfg)
-        try:
-            while r.alive:
-                r.post(("clear",))
-                for i in range(c["n"]):
-                    if not r.alive:
-                        return
-                    vset = c["v0"] + (c["v1"] - c["v0"]) * i / float(c["n"] - 1)
-                    dev.write_out(c["out"], vset)
-                    sleep_while(r, c["dt"])
-                    vn = [dev.ai(c["node"]) for _ in range(4)]
-                    vn = [v for v in vn if v is not None]
-                    if not vn:
-                        continue
-                    vd = mean(vn)
-                    if c["srcm"] is not None:
-                        vs_ = [dev.ai(c["srcm"]) for _ in range(4)]
-                        vs_ = [v for v in vs_ if v is not None]
-                        vs = mean(vs_) if vs_ else vset
-                    else:
-                        vs = round(vset / dev.vref * 255) * dev.vref / 255.0
-                    r.post(("pt", vd, (vs - vd) / c["r"], vs, i + 1, c["n"]))
-                if self.once:
-                    return
-        finally:
-            try:
-                dev.write_out(c["out"], 0.0)
-            except DeviceError:
-                pass
-
-    def on_data(self, obj):
-        if obj[0] == "clear":
-            self.pts = []
-            return
-        _k, vd, i, vs, k, n = obj
-        self.pts.append((vd, i, vs))
-        self.lb_pt.setText("V dispositivo %s   I %s   V fuente %s   R aparente %s" % (
-            eng(vd, "V", 4), eng(i, "A", 4), eng(vs, "V", 4),
-            eng(vd / i, "Ω", 4) if abs(i) > 1e-7 else "----"))
-        self.set_status("Punto %d de %d" % (k, n), "")
-        self.render()
-
-    def render(self):
-        xs = [p[0] for p in self.pts]
-        ys = [p[1] * 1000 for p in self.pts]
-        if xs:
-            lo, hi, n = nice_range(min(xs), max(xs), 8, zero=True)
-            self.plot.xr = (lo, hi)
-            self.plot.nx = n
-            lo, hi, n = nice_range(min(ys), max(ys), 8, zero=True)
-            self.plot.yr = (lo, hi)
-            self.plot.ny = n
-        else:
-            self.plot.xr, self.plot.yr = (0, 3.5), (0, 4)
-            self.plot.nx = 7
-        self.plot.set_traces([(xs, ys, C_CH[0], True)])
-
-    def log(self):
-        if not self.pts:
-            self.set_status("No hay datos que guardar.", "err")
-            return
-        self.save_csv(["V dispositivo (V)", "I (A)", "V fuente (V)"],
-                      [["%.5f" % a, "%.7g" % b, "%.5f" % c] for a, b, c in self.pts], "iv")
-
-
-_COMMON = ("\n\nTodas las entradas van de 0 V a la referencia de la tarjeta "
+_COMMON = (T("\n\nTodas las entradas van de 0 V a la referencia de la tarjeta "
            "(3.3 V en ESP32/K8, 5 V en UNO/Nano). Nunca metas tensiones negativas "
            "ni mayores: usa un divisor y el factor de sonda.\n\n"
            "El muestreo es por software (un comando por muestra por USB): unos "
            "cientos de muestras por segundo, compartidas entre todos los "
-           "instrumentos abiertos.")
+           "instrumentos abiertos."))
 
-DMM.HELP = ("Multímetro de una punta sobre una entrada analógica (AI).\n\n"
+DMM.HELP = (T("Multímetro de una punta sobre una entrada analógica (AI).\n\n"
             "V⎓  promedio de N muestras.\n"
             "V~  RMS de la parte alterna (desviación estándar); no necesita "
             "sincronizarse con la señal.\n"
@@ -1563,8 +1261,8 @@ DMM.HELP = ("Multímetro de una punta sobre una entrada analógica (AI).\n\n"
             "Ω   divisor con una resistencia de referencia conocida.\n"
             "•)))  continuidad: pita si R < umbral.\n\n"
             "Null guarda la lectura actual y la resta (modo relativo). "
-            "El cuadro 'Conexiones' muestra el pin exacto." + _COMMON)
-Scope.HELP = ("Osciloscopio de 2 canales.\n\n"
+            "El cuadro 'Conexiones' muestra el pin exacto.") + _COMMON)
+Scope.HELP = (T("Osciloscopio de 2 canales.\n\n"
               "Disparo Inmediato: la pantalla corre (modo roll).\n"
               "Disparo por Flanco: congela la señal cuando cruza el nivel con "
               "la pendiente elegida; el disparo queda a 1 división del borde "
@@ -1573,23 +1271,23 @@ Scope.HELP = ("Osciloscopio de 2 canales.\n\n"
               "(para divisores). Autoescala ajusta V/div, posición, tiempo/div y "
               "nivel de disparo.\n\n"
               "Con 2 canales cada uno recibe la mitad de las muestras. Sirve "
-              "para señales de hasta ~20-30 Hz." + _COMMON)
-FGen.HELP = ("Generador de funciones sobre el DAC (AO) o un PWM.\n\n"
+              "para señales de hasta ~20-30 Hz.") + _COMMON)
+FGen.HELP = (T("Generador de funciones sobre el DAC (AO) o un PWM.\n\n"
              "La forma de onda se calcula en la PC y se manda punto por punto, "
              "así que la frecuencia es exacta pero la resolución depende de las "
              "actualizaciones por segundo (abajo de la gráfica). Mantén la "
              "frecuencia por debajo de ~1/10 de esa tasa.\n\n"
              "PWM: la salida es una cuadrada de 1 kHz cuyo ciclo de trabajo "
-             "sigue la forma de onda. Pon un filtro RC (p. ej. 10 kΩ + 10 µF) "
+             "sigue la forma de onda. Pon un filtro RC (p. ej. 10 kΩ + 1 µF) "
              "para obtener la señal analógica.\n\n"
              "Barrido: recorre de Inicio a Fin en pasos, cambiando cada "
-             "Intervalo, y vuelve a empezar." + _COMMON)
-VPS.HELP = ("Dos salidas de tensión fija (DAC o PWM).\n\n"
+             "Intervalo, y vuelve a empezar.") + _COMMON)
+VPS.HELP = (T("Dos salidas de tensión fija (DAC o PWM).\n\n"
             "Mueve la perilla con Run activo y la salida cambia al instante. "
             "La pantalla muestra la tensión que realmente se programó (8 bits).\n\n"
             "Entrega pocos mA: para cargas usa un seguidor con op-amp o un "
-            "transistor. PWM necesita filtro RC." + _COMMON)
-Bode.HELP = ("Respuesta en frecuencia de un circuito.\n\n"
+            "transistor. PWM necesita filtro RC.") + _COMMON)
+Bode.HELP = (T("Respuesta en frecuencia de un circuito.\n\n"
              "Conexión: Salida → entrada del circuito y → AI 'Estímulo'.\n"
              "Salida del circuito → AI 'Respuesta'. GND común.\n\n"
              "En cada frecuencia se genera una senoidal, se espera un ciclo y se "
@@ -1597,55 +1295,37 @@ Bode.HELP = ("Respuesta en frecuencia de un circuito.\n\n"
              "|H| = Aout/Ain y fase = φout − φin.\n\n"
              "Límite práctico ~20 Hz: prueba filtros RC de constante grande "
              "(10 kΩ + 10 µF → fc ≈ 1.6 Hz). Si hay menos de 6 muestras por "
-             "ciclo el barrido se detiene y lo avisa." + _COMMON)
-DSA.HELP = ("Espectro de una señal (FFT).\n\n"
-            "Toma N muestras lo más rápido posible, las remuestrea a paso "
-            "uniforme y calcula la FFT con ventana Hanning. Arriba se ve la señal "
-            "en el tiempo; abajo el espectro en dBV rms o en V rms. La línea "
-            "naranja marca el pico.\n\n"
-            "La resolución es fs/N: más muestras = más resolución pero más "
-            "tiempo por lectura." + _COMMON)
-DigIn.HELP = ("Lee todas las entradas digitales (DI) y muestra su valor binario, "
+             "ciclo el barrido se detiene y lo avisa.") + _COMMON)
+DigIn.HELP = (T("Lee todas las entradas digitales (DI) y muestra su valor binario, "
               "decimal y hexadecimal.\n\n"
               "Las entradas no tienen pull-up: una línea sin conectar lee "
-              "valores al azar. Algunos canales DI comparten pin con AI." + _COMMON)
-DigOut.HELP = ("Escribe las salidas digitales (DO).\n\n"
+              "valores al azar. Algunos canales DI comparten pin con AI.") + _COMMON)
+DigOut.HELP = (T("Escribe las salidas digitales (DO).\n\n"
                "Manual: cada interruptor controla una línea (con Run activo se "
                "aplica al instante).\n"
                "Rampa: cuenta en binario. Alternado: 1010… / 0101…. "
                "Caminar un 1: un solo bit encendido que se desplaza.\n\n"
-               "Las salidas se quedan como están al presionar Stop." + _COMMON)
-IV.HELP = ("Trazador de curvas corriente-voltaje de dos terminales (diodos, "
-           "LEDs, resistencias).\n\n"
-           "Conexión: Salida → R serie → nodo → dispositivo → GND.\n"
-           "AI nodo mide el voltaje del dispositivo.\n"
-           "I = (Vfuente − Vnodo) / R.\n\n"
-           "Si usas PWM + filtro RC, o quieres más exactitud, mide la salida "
-           "real con otro AI y elígelo en 'AI fuente'. Sube la espera por punto "
-           "si el filtro es lento. Solo cuadrante positivo (0 a Vref)." + _COMMON)
-
-
+               "Las salidas se quedan como están al presionar Stop.") + _COMMON)
 TOOLS = [
-    ("dmm",    "DMM",     "Multímetro digital",          DMM,    ("ai",)),
-    ("scope",  "Scope",   "Osciloscopio",                Scope,  ("ai",)),
-    ("fgen",   "FGEN",    "Generador de funciones",      FGen,   ("out",)),
-    ("vps",    "VPS",     "Fuente variable",             VPS,    ("out",)),
-    ("bode",   "Bode",    "Analizador de Bode",          Bode,   ("out", "ai2")),
-    ("dsa",    "DSA",     "Analizador de espectro",      DSA,    ("ai",)),
-    ("digin",  "DigIn",   "Lector digital",              DigIn,  ("di",)),
-    ("digout", "DigOut",  "Escritor digital",            DigOut, ("do",)),
-    ("iv",     "2-Wire",  "Curva corriente-voltaje",     IV,     ("out", "ai")),
+    ("dmm",    "DMM",     T("Multímetro digital"),          DMM,    ("ai",)),
+    ("scope",  "Scope",   T("Osciloscopio"),                Scope,  ("ai",)),
+    ("fgen",   "FGEN",    T("Generador de funciones"),      FGen,   ("out",)),
+    ("vps",    "VPS",     T("Fuente variable"),             VPS,    ("out",)),
+    ("bode",   "Bode",    T("Analizador de Bode"),          Bode,   ("out", "ai2")),
+    ("digin",  "DigIn",   T("Lector digital"),              DigIn,  ("di",)),
+    ("digout", "DigOut",  T("Escritor digital"),            DigOut, ("do",)),
 ]
 
 HUB_QSS = QSS + """
-QToolButton#tile   { background:transparent; color:#f0f0f0; border:1px solid transparent;
-                     border-radius:6px; padding:6px 4px; font-size:12px; font-weight:bold; }
-QToolButton#tile:hover   { background:#2c3e5c; border:1px solid #6a8fc4; }
-QToolButton#tile:pressed { background:#1d2c46; }
-QToolButton#tile:disabled { color:#777777; }
-QFrame#strip       { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
-                         stop:0 #2a2a2a, stop:1 #161616);
-                     border:1px solid #555; border-radius:4px; }
+QToolButton#tile   { background:transparent; color:#1a1a1a; border:2px solid transparent;
+                     padding:6px 6px; font-size:12px; font-weight:bold; }
+QToolButton#tile:hover   { background:#ececec;
+                     border-color:#ffffff #707070 #707070 #ffffff; }
+QToolButton#tile:pressed { background:#b8e6b8;
+                     border-color:#707070 #ffffff #ffffff #707070; }
+QToolButton#tile:disabled { color:#8a8a8a; }
+QFrame#strip       { background:#e4e4e4; border:2px solid;
+                     border-color:#ffffff #8a8a8a #8a8a8a #ffffff; }
 """
 
 
@@ -1661,32 +1341,30 @@ class Hub(QWidget):
         self.setWindowIcon(QIcon(make_icon("scope", 64)))
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 8)
+        root.setContentsMargins(0, 8, 0, 8)
         root.setSpacing(8)
-        head = QFrame()
-        head.setObjectName("header")
-        hl = QHBoxLayout(head)
-        hl.setContentsMargins(14, 8, 14, 8)
-        t = QLabel("LV_ESP32 Instrument Launcher")
-        t.setObjectName("title")
-        b = QLabel("Tesla Lab · Universidad Galileo")
-        b.setObjectName("brand")
-        hl.addWidget(t)
-        hl.addStretch(1)
-        hl.addWidget(b)
-        root.addWidget(head)
 
-        g, f = group("Dispositivo")
+        g, f = group(T("Dispositivo"))
         self.cb_port = combo([])
-        self.btn_scan = QPushButton("Actualizar")
-        self.btn_conn = QPushButton("Conectar")
+        self.btn_scan = QPushButton(T("Actualizar"))
+        self.btn_conn = QPushButton(T("Conectar"))
         self.btn_conn.setObjectName("run")
-        self.lb_dev = QLabel("Sin conexión")
-        f.addWidget(QLabel("Puerto"), 0, 0)
+        self.btn_conn.setStyleSheet("min-width:110px;")
+        self.cb_lang = combo(LANGS)
+        self.cb_lang.setCurrentIndex(self.cb_lang.findData(lv_hub_lang.LANG))
+        self.lb_dev = QLabel(T("Sin conexión"))
+        self.lb_dev.setObjectName("board")
+        self.lb_cnt = QLabel("")
+        self.lb_cnt.setObjectName("hint")
+        f.addWidget(QLabel(T("Puerto")), 0, 0)
         f.addWidget(self.cb_port, 0, 1)
         f.addWidget(self.btn_scan, 0, 2)
         f.addWidget(self.btn_conn, 0, 3)
-        f.addWidget(self.lb_dev, 1, 0, 1, 4)
+        f.addWidget(QLabel(T("Idioma")), 0, 4)
+        f.addWidget(self.cb_lang, 0, 5)
+        f.addWidget(QLabel(T("Tarjeta")), 1, 0)
+        f.addWidget(self.lb_dev, 1, 1, 1, 5)
+        f.addWidget(self.lb_cnt, 2, 1, 1, 5)
         f.setColumnStretch(1, 1)
         w = QHBoxLayout()
         w.setContentsMargins(8, 0, 8, 0)
@@ -1703,7 +1381,7 @@ class Hub(QWidget):
             tb = QToolButton()
             tb.setObjectName("tile")
             tb.setIcon(QIcon(make_icon(key, 64)))
-            tb.setIconSize(QSize(56, 56))
+            tb.setIconSize(QSize(44, 44))
             tb.setText(short)
             tb.setToolTip(name)
             tb.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
@@ -1716,8 +1394,8 @@ class Hub(QWidget):
         w.addWidget(strip)
         root.addLayout(w)
 
-        self.lb_status = QLabel("Elige el puerto de la tarjeta y presiona Conectar. "
-                                "'Simulador' funciona sin hardware.")
+        self.lb_status = QLabel(T("Elige el puerto de la tarjeta y presiona Conectar. "
+                                "'Simulador' funciona sin hardware."))
         self.lb_status.setObjectName("status")
         self.lb_status.setWordWrap(True)
         w = QHBoxLayout()
@@ -1727,6 +1405,7 @@ class Hub(QWidget):
 
         self.btn_scan.clicked.connect(lambda: self.scan())
         self.btn_conn.clicked.connect(self.toggle)
+        self.cb_lang.currentIndexChanged.connect(self.set_lang)
         self.scan(port)
         self._tiles()
         if sim:
@@ -1742,7 +1421,7 @@ class Hub(QWidget):
         for p in lv_core.list_ports():
             self.cb_port.addItem(p["port"] + ("  —  " + p["label"] if p["label"] else ""),
                                  p["port"])
-        self.cb_port.addItem("Simulador (sin tarjeta)", "SIM")
+        self.cb_port.addItem(T("Simulador (sin tarjeta)"), "SIM")
         if old:
             i = self.cb_port.findData(old)
             if i < 0 and prefer:
@@ -1762,12 +1441,12 @@ class Hub(QWidget):
             return
         port = self.cb_port.currentData()
         if not port:
-            self.set_status("No hay puerto seleccionado.", "err")
+            self.set_status(T("No hay puerto seleccionado."), "err")
             return
         dev = SimDevice() if port == "SIM" else Device()
         self.btn_conn.setEnabled(False)
         self.cb_port.setEnabled(False)
-        self.set_status("Conectando con %s (la tarjeta se reinicia, ~2 s)..." % port, "")
+        self.set_status(T("Conectando con %s (la tarjeta se reinicia, ~2 s)...") % port, "")
 
         def job(r):
             dev.open(port)
@@ -1781,11 +1460,13 @@ class Hub(QWidget):
     def _connected(self, dev):
         self.dev = dev
         self.btn_conn.setEnabled(True)
-        self.btn_conn.setText("Desconectar")
+        self.btn_conn.setText(T("Desconectar"))
         self.btn_conn.setObjectName("stop")
         self.btn_conn.setStyle(self.btn_conn.style())
         self.lb_dev.setText(dev.describe())
-        self.set_status("Conectado. Abre un instrumento.", "ok")
+        self.lb_cnt.setText(dev.counts())
+        self.setWindowTitle("LV_ESP32 Instrument Launcher — " + dev.board_name)
+        self.set_status(T("Conectado. Abre un instrumento."), "ok")
         self._tiles()
         for w in list(self.wins.values()):
             w.device_changed()
@@ -1805,27 +1486,44 @@ class Hub(QWidget):
         self.dev = Device()
         for w in list(self.wins.values()):
             w.device_changed()
-        self.btn_conn.setText("Conectar")
+        self.btn_conn.setText(T("Conectar"))
         self.btn_conn.setObjectName("run")
         self.btn_conn.setStyle(self.btn_conn.style())
         self.cb_port.setEnabled(True)
-        self.lb_dev.setText("Sin conexión")
-        self.set_status("Desconectado.", "")
+        self.lb_dev.setText(T("Sin conexión"))
+        self.lb_cnt.setText("")
+        self.setWindowTitle("LV_ESP32 Instrument Launcher")
+        self.set_status(T("Desconectado."), "")
         self._tiles()
+
+    def set_lang(self, _i):
+        lang = self.cb_lang.currentData()
+        if lang == lv_hub_lang.LANG:
+            return
+        lv_hub_lang.save(lang)
+        args = [os.path.abspath(__file__), "--lang", lang]
+        if self.dev.connected:
+            args += ["--sim"] if self.dev.simulated else ["--port", self.dev.port]
+        for w in list(self.wins.values()):
+            w.close()
+        self.dev.close()
+        import subprocess
+        subprocess.Popen([sys.executable] + args)
+        QApplication.quit()
 
     def _ok_for(self, needs):
         d = self.dev
         if not d.connected:
-            return False, "Conecta una tarjeta"
+            return False, T("Conecta una tarjeta")
         for n in needs:
             if n == "ai" and d.n["ai"] < 1:
-                return False, "La tarjeta no tiene entradas analógicas"
+                return False, T("La tarjeta no tiene entradas analógicas")
             if n == "ai2" and d.n["ai"] < 2:
-                return False, "Necesita 2 entradas analógicas"
+                return False, T("Necesita 2 entradas analógicas")
             if n == "out" and not d.outputs():
-                return False, "La tarjeta no tiene DAC ni PWM"
+                return False, T("La tarjeta no tiene DAC ni PWM")
             if n in ("di", "do") and d.n[n] < 1:
-                return False, "La tarjeta no tiene %s" % n.upper()
+                return False, T("La tarjeta no tiene %s") % n.upper()
         return True, ""
 
     def _tiles(self):
@@ -1863,10 +1561,12 @@ class Hub(QWidget):
 
 def main():
     ap = argparse.ArgumentParser(description="LV_ESP32 Instrument Hub")
-    ap.add_argument("--port", default=None, help="puerto de la tarjeta (COM5, /dev/ttyUSB0...)")
-    ap.add_argument("--sim", action="store_true", help="usar el simulador, sin tarjeta")
+    ap.add_argument("--port", default=None, help=T("puerto de la tarjeta (COM5, /dev/ttyUSB0...)"))
+    ap.add_argument("--sim", action="store_true", help=T("usar el simulador, sin tarjeta"))
+    ap.add_argument("--lang", choices=[k for k, _n in LANGS], default=None,
+                    help="es / en")
     ap.add_argument("--tool", default=None, choices=[t[0] for t in TOOLS],
-                    help="abrir directo un instrumento al conectar")
+                    help=T("abrir directo un instrumento al conectar"))
     a = ap.parse_args()
     app = QApplication(sys.argv)
     app.setApplicationName("LV_ESP32 Instrument Hub")

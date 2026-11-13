@@ -4,6 +4,7 @@ import threading
 import time
 
 import lv_wire
+from lv_hub_lang import T
 
 PINS = {
     "ESP32-U": {
@@ -45,6 +46,15 @@ PINS = {
 }
 PINS["SIM"] = PINS["ESP32-U"]
 
+BOARD_NAMES = {
+    "ESP32-U": "ESP32 Wrover (Welcome Kit UG)",
+    "NANO-ESP32": "Arduino Nano ESP32",
+    "UNO": "Arduino UNO",
+    "NANO": "Arduino Nano",
+    "K8": "Nucleo F303K8",
+    "SIM": T("Simulador"),
+}
+
 VREF = {"UNO": 5.0, "NANO": 5.0}
 DEFAULT_VREF = 3.3
 
@@ -70,7 +80,7 @@ class Device(object):
         try:
             w = lv_wire.Wire(port, timeout=0.5)
         except Exception as e:
-            raise DeviceError("No se pudo abrir %s: %s" % (port, e))
+            raise DeviceError(T("No se pudo abrir %s: %s") % (port, e))
         ident = None
         for _ in range(3):
             try:
@@ -81,8 +91,8 @@ class Device(object):
                 break
         if not ident or "n" not in ident:
             w.close()
-            raise DeviceError("La tarjeta en %s no respondio a la identidad (0xEF). "
-                              "¿Tiene cargado el firmware LV_ESP32 v3?" % port)
+            raise DeviceError(T("La tarjeta en %s no respondio a la identidad (0xEF). "
+                              "¿Tiene cargado el firmware LV_ESP32 v3?") % port)
         self.wire = w
         self.port = port
         self._set_ident(ident["board"], ident["variant"], ident["version"],
@@ -103,11 +113,18 @@ class Device(object):
     def connected(self):
         return self.wire is not None
 
+    @property
+    def board_name(self):
+        return T(BOARD_NAMES.get(self.board, self.board or "?"))
+
     def describe(self):
+        return "%s   ·   %s %s   ·   Vref %.1f V" % (self.board_name, self.variant,
+                                                   self.version, self.vref)
+
+    def counts(self):
         n = self.n
-        return ("%s  (%s %s)   DI %d · DO %d · AI %d · AO %d · PWM %d"
-                % (self.board, self.variant, self.version,
-                   n["di"], n["do"], n["ai"], n["ao"], n["pwm"]))
+        return "DI %d · DO %d · AI %d · AO %d · PWM %d" % (
+            n["di"], n["do"], n["ai"], n["ao"], n["pwm"])
 
     def pin(self, kind, ch):
         lst = PINS.get(self.board, {}).get(kind, [])
@@ -119,11 +136,11 @@ class Device(object):
 
     def _cmd(self, name, args):
         if self.wire is None:
-            raise DeviceError("No hay tarjeta conectada.")
+            raise DeviceError(T("No hay tarjeta conectada."))
         try:
             return self.wire.cmd(name, args)
         except Exception as e:
-            raise DeviceError("Error de comunicacion: %s" % e)
+            raise DeviceError(T("Error de comunicacion: %s") % e)
 
     def _ack(self, name, args):
         with self.lock:
@@ -162,9 +179,9 @@ class Device(object):
     def outputs(self):
         out = []
         for i in range(self.n["ao"]):
-            out.append(("AO%d" % i, "AO%d  (DAC, %s)" % (i, self.pin("ao", i))))
+            out.append(("AO%d" % i, T("AO%d  (DAC, %s)") % (i, self.pin("ao", i))))
         for i in range(self.n["pwm"]):
-            out.append(("PWM%d" % i, "PWM%d  (%s, 1 kHz: requiere filtro RC)"
+            out.append(("PWM%d" % i, T("PWM%d  (%s, 1 kHz: requiere filtro RC)")
                         % (i, self.pin("pwm", i))))
         return out
 
@@ -177,7 +194,7 @@ class Device(object):
             return self.ao_raw(int(key[2:]), code)
         if key.startswith("PWM"):
             return self.pwm_raw(int(key[3:]), code)
-        raise DeviceError("Salida desconocida: %s" % key)
+        raise DeviceError(T("Salida desconocida: %s") % key)
 
 
 class SimDevice(Device):
@@ -196,7 +213,7 @@ class SimDevice(Device):
 
     def open(self, port="SIM"):
         self.wire = True
-        self._set_ident("SIM", "ESP32", "3.0.0 (simulado)",
+        self._set_ident("SIM", "ESP32", T("3.0.0 (simulado)"),
                         {"di": 10, "do": 3, "ai": 6, "ao": 1, "pwm": 2,
                          "servo": 2, "neo": 2})
 
@@ -205,7 +222,7 @@ class SimDevice(Device):
 
     def _wait(self):
         if self.wire is None:
-            raise DeviceError("No hay tarjeta conectada.")
+            raise DeviceError(T("No hay tarjeta conectada."))
         time.sleep(self.LATENCY * random.uniform(0.8, 1.3))
 
     def _vout(self):
