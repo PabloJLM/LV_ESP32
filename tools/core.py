@@ -1,0 +1,1002 @@
+import argparse
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+FROZEN = bool(getattr(sys, "frozen", False))
+if FROZEN:
+    HERE = os.path.dirname(os.path.abspath(sys.executable))
+    REPO = HERE
+else:
+    HERE = os.path.dirname(os.path.abspath(__file__))
+    REPO = os.path.dirname(HERE)
+
+BIN_DIR = os.path.join(REPO, "firmware", "bin")
+FLASHTOOLS_DIR = os.path.join(REPO, "Config", "flashtools")
+
+IS_WIN = os.name == "nt"
+
+_WROVER_VIDPID = [("10C4", "EA60"), ("1A86", "7523"), ("1A86", "55D4"),
+                  ("0403", "6001")]
+_NANO32_VIDPID = [("2341", None), ("303A", None)]
+_STLINK_VIDPID = [("0483", "374B"), ("0483", "374E"), ("0483", "3752")]
+_NANO32_NOTE = ("Antes de cargar: doble clic rapido en RESET (LED verde fijo).")
+
+BOARDS = {
+    "esp32_wrover": {
+        "label":  "ESP32 Wrover - Welcome Kit UG  ·  USB",
+        "method": "esptool",
+        "bin":    "esp32_wrover.bin",
+        "chip":   "esp32",
+        "baud":   "921600",
+        "vidpid": _WROVER_VIDPID,
+    },
+    "esp32_wrover_online": {
+        "label":  "ESP32 Wrover - Welcome Kit UG  ·  USB + WiFi/FTP (SD por SPI)",
+        "method": "esptool",
+        "bin":    "esp32_wrover_online.bin",
+        "chip":   "esp32",
+        "baud":   "921600",
+        "online": True,
+        "vidpid": _WROVER_VIDPID,
+    },
+    "nano_esp32": {
+        "label":  "Arduino Nano ESP32  ·  USB  (sin DAC)",
+        "method": "dfu",
+        "bin":    "nano_esp32.bin",
+        "dfu_id": "2341:0070",
+        "needs_port": False,
+        "note":   _NANO32_NOTE,
+        "vidpid": _NANO32_VIDPID,
+        "post_vidpid": _NANO32_VIDPID,
+    },
+    "nano_esp32_online": {
+        "label":  "Arduino Nano ESP32  ·  USB + WiFi/FTP (SD por SPI)",
+        "method": "dfu",
+        "bin":    "nano_esp32_online.bin",
+        "dfu_id": "2341:0070",
+        "needs_port": False,
+        "online": True,
+        "note":   _NANO32_NOTE,
+        "vidpid": _NANO32_VIDPID,
+        "post_vidpid": _NANO32_VIDPID,
+    },
+    "nucleo_f303k8": {
+        "label":  "Nucleo F303K8 (K8)  ·  USB (ST-Link)",
+        "method": "stlink_copy",
+        "bin":    "nucleo_f303k8.bin",
+        "needs_port":  False,
+        "post_vidpid": _STLINK_VIDPID,
+        "vidpid": _STLINK_VIDPID,
+    },
+    "uno": {
+        "label":  "Arduino UNO R3  ·  USB  (sin DAC)",
+        "method": "avrdude",
+        "bin":    "uno.hex",
+        "baud":   115200,
+        "vidpid": [("2341", None), ("1A86", "7523")],
+    },
+    "nano": {
+        "label":  "Arduino Nano (bootloader viejo)  ·  USB  (sin DAC)",
+        "method": "avrdude",
+        "bin":    "nano.hex",
+        "baud":   57600,
+        "vidpid": [("1A86", "7523"), ("0403", "6001")],
+    },
+}
+
+DEFAULT_BOARD = "esp32_wrover"
+
+
+def _noop(*_a, **_k):
+    pass
+
+
+def _no_window():
+    if not IS_WIN:
+        return {}
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    return {"startupinfo": si, "creationflags": 0x08000000}
+
+
+def _python_exe():
+    exe = sys.executable
+    if os.path.basename(exe).lower() == "pythonw.exe":
+        alt = os.path.join(os.path.dirname(exe), "python.exe")
+        if os.path.isfile(alt):
+            return alt
+    return exe
+
+
+def bin_path(board_key):
+    return os.path.join(BIN_DIR, BOARDS[board_key]["bin"])
+
+
+def display_path(p):
+    if not p:
+        return p
+    try:
+        rel = os.path.relpath(p, REPO)
+    except ValueError:
+        return p
+    return p if rel.split(os.sep)[0] == os.pardir else rel
+
+
+def resolve_path(p):
+    p = os.path.expanduser((p or "").strip())
+    if not p:
+        return ""
+    return os.path.normpath(p if os.path.isabs(p) else os.path.join(REPO, p))
+
+
+def _shown(args, binf):
+    return " ".join(args).replace(binf, display_path(binf))
+
+
+def _missing_tool(folder, exe):
+    rel = os.path.join("Config", "flashtools", folder,
+                       exe + (".exe" if IS_WIN else ""))
+    msg = "Falta %s" % rel
+    if not IS_WIN:
+        msg += " (o instalalo en el sistema: sudo apt install %s)" % folder
+    return msg
+
+
+_PERM_HINT = ("" if IS_WIN else
+              " En Linux: sudo usermod -aG dialout $USER  y reinicia sesion.")
+
+
+def _tool(folder, exe):
+    name = exe + (".exe" if IS_WIN else "")
+    p = os.path.join(FLASHTOOLS_DIR, folder, name)
+    if os.path.isfile(p):
+        return p
+    return shutil.which(exe)
+
+
+def esptool_cmd():
+    exe = _tool("esptool", "esptool")
+    if exe:
+        return [exe]
+    if not FROZEN:
+        try:
+            import importlib.util
+            if importlib.util.find_spec("esptool") is not None:
+                return [_python_exe(), "-u", "-m", "esptool"]
+        except Exception:
+            pass
+    return None
+
+
+def dfu_path():
+    return _tool("dfu-util", "dfu-util")
+
+
+def avrdude_path():
+    return _tool("avrdude", "avrdude")
+
+
+def list_ports():
+    out = []
+    try:
+        import serial.tools.list_ports as lp
+        for p in lp.comports():
+            out.append({"port": p.device, "label": p.description or "",
+                        "vid": ("%04X" % p.vid) if p.vid else "",
+                        "pid": ("%04X" % p.pid) if p.pid else ""})
+    except Exception:
+        pass
+    return [p for p in out if p["port"]]
+
+
+def guess_port(board_key, ports=None):
+    ports = ports if ports is not None else list_ports()
+    for vid, pid in BOARDS[board_key]["vidpid"]:
+        for p in ports:
+            if p["vid"] == vid and (pid is None or p["pid"] == pid):
+                return p["port"]
+    return ports[0]["port"] if len(ports) == 1 else ""
+
+
+_PCT = re.compile(r"(\d+(?:\.\d+)?) ?%")
+
+
+def _run_proc(cmd, shown, on_line, on_step, timeout=300):
+    on_line("$ " + shown)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         bufsize=0, **_no_window())
+    buf = []
+    st = {"cur": "", "replace": False}
+
+    def emit(text):
+        buf.append(text)
+        m = _PCT.search(text)
+        kind = ("Reading" if "Reading" in text else
+                "Writing" if "Writing" in text else
+                "Download" if "Download" in text else "")
+        if m and kind:
+            pct = min(100, int(float(m.group(1))))
+            if kind == "Reading":
+                on_step(55 + int(pct * 0.35), "Verificando... %d %%" % pct)
+            else:
+                span = 35 if "avrdude" in cmd[0].lower() else 70
+                on_step(20 + int(pct * span / 100.0), "Cargando... %d %%" % pct)
+        on_line(("\r" if st["replace"] else "") + text)
+
+    def flush(cr):
+        text = st["cur"]
+        st["cur"] = ""
+        if not text.strip():
+            if not cr:
+                st["replace"] = False
+            return
+        emit(text)
+        st["replace"] = cr
+
+    try:
+        while True:
+            data = p.stdout.read(4096)
+            if not data:
+                break
+            for ch in data.decode("utf-8", "replace"):
+                if ch == "\r":
+                    flush(True)
+                elif ch == "\n":
+                    flush(False)
+                else:
+                    st["cur"] += ch
+        flush(False)
+        p.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        return 124, "\n".join(buf) + "\n[timeout]"
+    return p.returncode, "\n".join(buf)
+
+
+def upload_esptool(board_key, port, binf, on_line=None, on_step=None):
+    line = on_line or _noop
+    step = on_step or _noop
+    spec = BOARDS[board_key]
+
+    cmd = esptool_cmd()
+    if not cmd:
+        return False, _missing_tool("esptool", "esptool")
+    step(15, "Conectando con %s..." % port)
+    args = ["--chip", spec["chip"], "--port", port, "--baud", spec["baud"],
+            "--before", "default-reset", "--after", "hard-reset",
+            "write-flash", "-z", "0x0", binf]
+    rc, txt = _run_proc(cmd + args, "esptool " + _shown(args, binf), line, step)
+    if rc != 0:
+        blob = txt.lower()
+        hint = ""
+        if "failed to connect" in blob or "no serial data" in blob \
+                or "wrong boot mode" in blob:
+            hint = " Manten presionado BOOT mientras inicia la carga."
+        elif ("access is denied" in blob or "permission" in blob
+              or "could not open" in blob or "busy" in blob):
+            hint = (" Cierra el monitor serie, el IDE o el VI que use el puerto.") + _PERM_HINT
+        return False, "Fallo la carga en %s.%s" % (port, hint)
+    step(95, "Carga terminada")
+    return True, "Firmware cargado en %s" % port
+
+
+def upload_avrdude(board_key, port, binf, on_line=None, on_step=None):
+    line = on_line or _noop
+    step = on_step or _noop
+    spec = BOARDS[board_key]
+
+    exe = avrdude_path()
+    if not exe:
+        return False, _missing_tool("avrdude", "avrdude")
+    conf = os.path.join(os.path.dirname(exe), "avrdude.conf")
+    args = []
+    if os.path.isfile(conf):
+        args += ["-C", conf]
+    args += ["-p", "atmega328p", "-c", "arduino", "-P", port,
+             "-b", str(spec["baud"]), "-D", "-U", "flash:w:%s:i" % binf]
+
+    step(15, "Hablando con el bootloader en %s..." % port)
+    rc, txt = _run_proc([exe] + args, "avrdude " + _shown(args, binf), line, step)
+    if rc != 0:
+        blob = txt.lower()
+        hint = ""
+        if "not in sync" in blob or "stk500" in blob:
+            hint = (" El bootloader no responde. Revisa la placa elegida (Nano viejo 57600, "
+                    "nuevo 115200).")
+        elif "can't open" in blob or "access" in blob or "denied" in blob:
+            hint = (" Cierra el monitor serie, el IDE o el VI que use el puerto.") + _PERM_HINT
+        return False, "Fallo la carga en %s.%s" % (port, hint)
+    step(95, "Carga terminada")
+    return True, "Firmware cargado en %s" % port
+
+
+def upload_dfu(board_key, port, binf, on_line=None, on_step=None):
+    line = on_line or _noop
+    step = on_step or _noop
+    spec = BOARDS[board_key]
+
+    exe = dfu_path()
+    if not exe:
+        return False, _missing_tool("dfu-util", "dfu-util")
+    step(15, "Buscando la placa en modo DFU...")
+    args = ["--device", "0x" + spec["dfu_id"].replace(":", ":0x"), "-D", binf, "-Q"]
+    rc, txt = _run_proc([exe] + args, "dfu-util " + _shown(args, binf), line, step, 180)
+    blob = txt.lower()
+    if rc != 0 and "downloaded successfully" not in blob \
+            and "download done" not in blob:
+        hint = ""
+        if "no dfu capable" in blob or "not found" in blob:
+            hint = (" Doble clic rapido en RESET (LED verde fijo) y vuelve a intentar. " +
+                    ("Si Windows no la reconoce, falta el driver DFU (viene con "
+                     "el Arduino IDE)." if IS_WIN else
+                     "En Linux hace falta una regla udev para 2341:0070 o correr "
+                     "con permisos (sudo)."))
+        elif "cannot open" in blob or "access" in blob:
+            hint = " Cierra lo que tenga la placa abierta e intenta otra vez."
+        return False, "Fallo la carga por DFU.%s" % hint
+    step(95, "Carga terminada")
+    return True, "Firmware cargado por DFU"
+
+
+def find_node_drive():
+    if IS_WIN:
+        import ctypes
+        buf = ctypes.create_unicode_buffer(261)
+        for letter in "DEFGHIJKLMNOPQRSTUVWXYZ":
+            root = letter + ":\\"
+            if not os.path.exists(root):
+                continue
+            ok = ctypes.windll.kernel32.GetVolumeInformationW(
+                root, buf, 261, None, None, None, None, 0)
+            if ok and buf.value.upper().startswith("NODE_"):
+                return root
+        return ""
+    for base in ("/media", "/run/media", "/Volumes", "/mnt"):
+        if not os.path.isdir(base):
+            continue
+        for root, dirs, _f in os.walk(base):
+            for d in dirs:
+                if d.upper().startswith("NODE_"):
+                    return os.path.join(root, d)
+            if root.count(os.sep) - base.count(os.sep) >= 2:
+                dirs[:] = []
+    return ""
+
+
+def upload_stlink_copy(board_key, port, binf, on_line=None, on_step=None):
+    import time
+    line = on_line or _noop
+    step = on_step or _noop
+
+    step(30, "Buscando la unidad NODE_xxx del ST-Link...")
+    drive = find_node_drive()
+    if not drive:
+        return False, ("No aparecio la unidad NODE_xxx del ST-Link. Usa un cable USB de datos.")
+    line("Unidad: %s" % drive)
+
+    step(50, "Copiando el binario...")
+    try:
+        shutil.copyfile(binf, os.path.join(drive, "firmware.bin"))
+    except OSError as e:
+        return False, "No se pudo copiar a %s (%s)." % (drive, e)
+
+    step(70, "El ST-Link esta grabando la placa...")
+    time.sleep(8.0)
+    step(95, "Carga terminada")
+    return True, "Firmware copiado a %s" % drive
+
+
+def probe_script_path():
+    return os.path.join(HERE, "core.py")
+
+
+def run_probe(port, on_line=None, on_step=None, peer_port=None,
+              dio=None, adc=None, pwm=None, servo=None, timeout=120):
+    line = on_line or _noop
+    step = on_step or _noop
+
+    script = probe_script_path()
+    if not os.path.isfile(script):
+        return False, "No se encontro tools\\core.py"
+    if not port:
+        return False, "Selecciona un puerto."
+
+    args = [sys.executable, "-u", script, "--port", port]
+    if peer_port: args += ["--peer-port", peer_port]
+    if dio   is not None: args += ["--dio",   str(dio)]
+    if adc   is not None: args += ["--adc",   str(adc)]
+    if pwm   is not None: args += ["--pwm",   str(pwm)]
+    if servo is not None: args += ["--servo", str(servo)]
+
+    step(5, "Probando %s..." % port)
+    try:
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             text=True, encoding="utf-8", errors="replace",
+                             bufsize=1, **_no_window())
+    except OSError as e:
+        return False, "No se pudo lanzar core.py: %s" % e
+
+    try:
+        for l in p.stdout:
+            l = l.rstrip("\r\n")
+            if l.strip():
+                line(l)
+        p.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        return False, "core.py no termino a tiempo (revisa el puerto)."
+
+    step(100, "Prueba terminada")
+    ok = (p.returncode == 0)
+    return ok, ("Todo paso" if ok else "Algo fallo -- revisa el log de arriba")
+
+
+def wait_port(vidpid, prefer=None, timeout=12.0):
+    import time
+    t0 = time.time()
+    while True:
+        found = []
+        for p in list_ports():
+            for vid, pid in vidpid:
+                if p["vid"] == vid and (pid is None or p["pid"] == pid):
+                    found.append(p["port"])
+                    break
+        if found:
+            return prefer if prefer in found else found[0]
+        if time.time() - t0 >= timeout:
+            return ""
+        time.sleep(1.0)
+
+
+def ping_board(port, wait_reset=2.0):
+    try:
+        import serial
+    except ImportError:
+        return None, "pyserial no disponible"
+    try:
+        import time
+        with serial.Serial(port, 115200, timeout=2.0) as s:
+            time.sleep(wait_reset)
+            s.reset_input_buffer()
+            s.write(bytes([0xF0]))
+            r = s.read(2)
+            return (r == b"AA"), ("respuesta %r" % r)
+    except Exception as e:
+        return False, str(e)
+
+
+def flash_all(board_key, port, on_line=None, on_step=None, verify=True,
+              bin_file=None):
+    line = on_line or _noop
+    step = on_step or _noop
+    spec = BOARDS[board_key]
+    method = spec["method"]
+    binf = resolve_path(bin_file) if bin_file else bin_path(board_key)
+
+    if spec.get("needs_port", True) and not port:
+        return False, "Selecciona un puerto."
+    if not os.path.isfile(binf):
+        return False, ("No existe el archivo %s. Compilalo siguiendo %s."
+                       % (display_path(binf), os.path.join("firmware", "COMPILAR.md")))
+
+    uploader = {"esptool": upload_esptool, "dfu": upload_dfu,
+                "avrdude": upload_avrdude, "stlink_copy": upload_stlink_copy}[method]
+    step(5, "Preparando %s..." % os.path.basename(binf))
+    line("Archivo: %s" % display_path(binf))
+    ok, msg = uploader(board_key, port, binf, line, step)
+    if not ok:
+        return False, msg
+
+    if verify:
+        step(98, "Verificando la tarjeta...")
+        if spec.get("post_vidpid"):
+            line("Buscando el puerto del firmware...")
+            port = wait_port(spec["post_vidpid"], prefer=port)
+            if not port:
+                return True, ("Firmware cargado, pero no aparecio el puerto. Reconecta el USB.")
+        alive, detail = ping_board(port)
+        if alive is None:
+            line("(sin verificar: %s)" % detail)
+        elif alive:
+            line("PING 0xF0 -> 'AA'   la tarjeta responde")
+        else:
+            return False, ("Firmware cargado, pero la tarjeta no responde (%s). Reconecta el USB." % detail)
+
+    step(100, "Listo")
+    return True, ("Firmware cargado correctamente en %s" % port) if port \
+        else "Firmware cargado correctamente"
+
+
+WIFI_TXT = {0: "apagado", 1: "conectando...", 2: "conectado",
+            3: "fallo (red no encontrada o clave incorrecta)"}
+FTP_TXT  = {0: "apagado", 1: "activo", 2: "error de SD (¿esta puesta y cableada?)"}
+
+
+class LvLink(object):
+
+    def __init__(self, port, wait_reset=2.0):
+        import serial
+        import time
+        self.port = port
+        self.s = serial.Serial(port, 115200, timeout=2.0)
+        time.sleep(wait_reset)
+        self.s.reset_input_buffer()
+
+    def close(self):
+        try:
+            self.s.close()
+        except Exception:
+            pass
+
+    def _ack(self, payload):
+        self.s.reset_input_buffer()
+        self.s.write(bytes(payload))
+        return self.s.read(2) == b"AA"
+
+    @staticmethod
+    def _two(cmd, a, b):
+        a, b = a.encode("utf-8"), b.encode("utf-8")
+        return bytes([cmd, len(a), len(b)]) + a + b
+
+    def identity(self):
+        self.s.reset_input_buffer()
+        self.s.write(bytes([0xEF]))
+        return self.s.readline().decode("ascii", "replace").strip()
+
+    def is_online(self):
+        ident = self.identity()
+        return ident.startswith("LV,") and ident.split(",")[1].endswith("-ONLINE"), ident
+
+    def wifi_save(self, ssid, pw):
+        if not (1 <= len(ssid.encode("utf-8")) <= 32 and len(pw.encode("utf-8")) <= 63):
+            return False
+        return self._ack(self._two(0xC1, ssid, pw))
+
+    def wifi_connect(self):
+        return self._ack([0xC2])
+
+    def wifi_disconnect(self):
+        return self._ack([0xC4])
+
+    def ftp_save(self, user, pw):
+        if not (1 <= len(user.encode("utf-8")) <= 32 and 1 <= len(pw.encode("utf-8")) <= 32):
+            return False
+        return self._ack(self._two(0xC5, user, pw))
+
+    def ftp_set(self, on):
+        return self._ack([0xC6, 1 if on else 0])
+
+    def status(self):
+        self.s.reset_input_buffer()
+        self.s.write(bytes([0xC3]))
+        parts = self.s.readline().decode("ascii", "replace").strip().split(",")
+        if len(parts) != 5:
+            return None
+        try:
+            return {"wifi": int(parts[0]), "ip": parts[1], "rssi": int(parts[2]),
+                    "ftp": int(parts[3]), "sd_mb": int(parts[4])}
+        except ValueError:
+            return None
+
+
+def _fmt_status(st):
+    if st is None:
+        return "Sin respuesta valida a 0xC3 (¿firmware ONLINE cargado?)"
+    txt = "WiFi: %s" % WIFI_TXT.get(st["wifi"], st["wifi"])
+    if st["wifi"] == 2:
+        txt += "  IP %s  (%d dBm)" % (st["ip"], st["rssi"])
+    txt += "   |   FTP: %s" % FTP_TXT.get(st["ftp"], st["ftp"])
+    if st["ftp"] == 1:
+        txt += "  (SD %d MB)" % st["sd_mb"]
+    return txt
+
+
+def online_check(link, on_line=None):
+    line = on_line or _noop
+    ok, ident = link.is_online()
+    line("Identidad: %s" % (ident or "(sin respuesta)"))
+    if not ident:
+        return False, "La tarjeta no responde. ¿Puerto correcto? ¿Hay un VI con el puerto abierto?"
+    if not ok:
+        return False, ("Este firmware no es ONLINE. Carga una variante '+ WiFi/FTP'.")
+    return True, "Variante ONLINE detectada"
+
+
+def online_connect(link, ssid, pw, on_line=None, on_step=None, timeout=25):
+    import time
+    line = on_line or _noop
+    step = on_step or _noop
+    ok, msg = online_check(link, line)
+    if not ok:
+        return False, msg
+    if not link.wifi_save(ssid, pw):
+        return False, "La tarjeta rechazo el SSID/clave (SSID: 1 a 32 caracteres, clave: 0 a 63)."
+    if not link.wifi_connect():
+        return False, "La tarjeta no pudo iniciar la conexion."
+
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        st = link.status()
+        line(_fmt_status(st))
+        if st and st["wifi"] == 2:
+            step(100, "")
+            return True, "Conectado a '%s'. IP: %s" % (ssid, st["ip"])
+        if st and st["wifi"] == 3:
+            return False, "No se pudo conectar a '%s': revisa el nombre y la clave." % ssid
+        step(min(95, int(100 * (time.time() - t0) / timeout)), "Conectando a %s..." % ssid)
+        time.sleep(1.0)
+    return False, "La red '%s' no respondio a tiempo." % ssid
+
+
+def online_ftp_start(link, user, pw, on_line=None):
+    line = on_line or _noop
+    ok, msg = online_check(link, line)
+    if not ok:
+        return False, msg
+    if not link.ftp_save(user, pw):
+        return False, "Usuario y clave del FTP: de 1 a 32 caracteres cada uno."
+    if not link.ftp_set(True):
+        st = link.status()
+        line(_fmt_status(st))
+        if st and st["wifi"] != 2:
+            return False, "No hay WiFi conectado: conecta primero."
+        if st and st["ftp"] == 2:
+            return False, FTP_TXT[2]
+        return False, "La tarjeta no pudo iniciar el FTP."
+    st = link.status()
+    line(_fmt_status(st))
+    if st and st["ftp"] == 1:
+        return True, ("FTP activo:  ftp://%s@%s/   (SD %d MB). En el Explorador "
+                      "de Windows escribe esa direccion." % (user, st["ip"], st["sd_mb"]))
+    return True, "FTP activo"
+
+
+def online_ftp_stop(link, on_line=None):
+    ok = link.ftp_set(False)
+    return ok, "FTP detenido (SD liberada)" if ok else "La tarjeta no respondio"
+
+
+def online_disconnect(link, on_line=None):
+    ok = link.wifi_disconnect()
+    return ok, "WiFi desconectado (radio apagado, ADC2 disponible)" if ok else "La tarjeta no respondio"
+
+
+def online_status(link, on_line=None):
+    ok, msg = online_check(link, on_line)
+    if not ok:
+        return False, msg
+    st = link.status()
+    return st is not None, _fmt_status(st)
+
+
+
+try:
+    import serial
+except ImportError:
+    serial = None
+
+BAUD = 115200
+
+SIMPLE = {
+    "do":      (0x01, [("canal", 0, 255), ("valor", 0, 1)],            "ack",  "salida digital"),
+    "di":      (0x02, [("canal", 0, 255)],                             "dig",  "entrada digital"),
+    "neo":     (0x03, [("r", 0, 255), ("g", 0, 255), ("b", 0, 255)],    "ack",  "NeoPixel: toda la tira"),
+    "neopx":   (0x04, [("pixel", 0, 255), ("r", 0, 255), ("g", 0, 255), ("b", 0, 255)],
+                                                                       "ack",  "NeoPixel: un pixel"),
+    "ai":      (0x05, [("canal", 0, 255)],                             "int",  "entrada analogica 0..4095"),
+    "ao":      (0x06, [("canal", 0, 255), ("valor", 0, 255)],          "ack",  "salida analogica (DAC)"),
+    "pwm":     (0x07, [("canal", 0, 255), ("duty", 0, 255)],           "ack",  "PWM"),
+    "servo":   (0x08, [("canal", 0, 255), ("angulo", 0, 255)],         "ack",  "servo 0..180"),
+    "neoopt":  (0x0A, [("opcion", 0, 255)],                            "ack",  "pin de la tira NeoPixel"),
+    "id":      (0xEF, [],                                              "line", "identidad"),
+    "ping":    (0xF0, [],                                              "ack",  "ping"),
+    "wconn":   (0xC2, [],                                              "ack",  "WiFi: conectar"),
+    "wstat":   (0xC3, [],                                              "line", "WiFi/FTP: estado"),
+    "wdisc":   (0xC4, [],                                              "ack",  "WiFi: desconectar"),
+    "ftp":     (0xC6, [("on", 0, 1)],                                  "ack",  "FTP + SD on/off"),
+    "gen":     (0xD0, [("canal", 0, 255), ("forma", 0, 3), ("f3", 0, 255), ("f2", 0, 255),
+                       ("f1", 0, 255), ("f0", 0, 255), ("amp", 0, 255), ("off", 0, 255),
+                       ("duty", 0, 255)],                              "ack",
+               "generador DAC: forma 0 sin 1 tri 2 cuad 3 sierra, f en mHz (4 bytes)"),
+    "genstop": (0xD1, [("canal", 0, 255)],                             "ack",  "generador DAC: parar"),
+    "genst":   (0xD2, [("canal", 0, 255)],                             "line", "generador DAC: estado"),
+}
+STRINGS = {
+    "lcd":     (0x09, "lcd [addr] col fila texto", "ack", "LCD I2C (addr 0x27 por defecto)"),
+    "wsave":   (0xC1, "wsave ssid [clave]",         "ack", "WiFi: guardar credenciales"),
+    "ftpsave": (0xC5, "ftpsave usuario clave",      "ack", "FTP: guardar usuario"),
+}
+REPLY = {n: v[2] for n, v in list(SIMPLE.items()) + list(STRINGS.items())}
+
+
+def build(name, args=(), text=None, text2=""):
+    if name in SIMPLE:
+        code, spec, _, _ = SIMPLE[name]
+        if len(args) != len(spec):
+            raise ValueError("%s espera %d argumento(s): %s"
+                             % (name, len(spec), " ".join(s[0] for s in spec)))
+        out = bytearray([code])
+        for (nm, lo, hi), v in zip(spec, args):
+            v = int(v)
+            if not lo <= v <= hi:
+                raise ValueError("%s: %s debe estar entre %d y %d" % (name, nm, lo, hi))
+            out.append(v)
+        if name == "di":
+            out.append(0)
+        return bytes(out)
+    if name == "lcd":
+        addr, col, row = [int(x) for x in args]
+        t = (text or "").encode("latin-1", "replace")[:16]
+        return bytes([0x09, addr, col, row, len(t)]) + t
+    if name in ("wsave", "ftpsave"):
+        a = (text or "").encode("utf-8")
+        b = (text2 or "").encode("utf-8")
+        if len(a) > 255 or len(b) > 255:
+            raise ValueError("cadena demasiado larga")
+        return bytes([STRINGS[name][0], len(a), len(b)]) + a + b
+    raise ValueError("comando desconocido: %s" % name)
+
+
+def raw_reply_kind(frame):
+    for n, v in list(SIMPLE.items()) + list(STRINGS.items()):
+        if v[0] == frame[0]:
+            return v[2]
+    return "ack"
+
+
+class Result:
+    def __init__(self, tx, rx, kind, ms):
+        self.tx, self.rx, self.kind, self.ms = tx, rx, kind, ms
+
+    @property
+    def text(self):
+        return self.rx.decode("latin-1", "replace").replace("\r", "").replace("\n", "\\n")
+
+    def verdict(self):
+        rx, k = self.rx, self.kind
+        if k in ("ack", "dig"):
+            if len(rx) < 2:
+                return False, "TIMEOUT (%d de 2 bytes)" % len(rx)
+            if rx[:2] == b"XX":
+                return False, "ERROR 'X','X' (canal invalido / no soportado)"
+            if k == "ack":
+                return (rx[:2] == b"AA"), ("OK" if rx[:2] == b"AA" else "respuesta rara: %r" % rx)
+            if rx[0:1] == b"A" and rx[1:2] in (b"0", b"1"):
+                return True, "entrada = %s" % rx[1:2].decode()
+            return False, "respuesta rara: %r" % rx
+        if not rx.endswith(b"\n"):
+            return False, "TIMEOUT (sin fin de linea)"
+        line = rx.decode("latin-1").strip()
+        if k == "int":
+            try:
+                v = int(line)
+            except ValueError:
+                return False, "no es un numero: %r" % line
+            if v == -1:
+                return False, "-1  canal no disponible ahora (ADC2 con WiFi)"
+            if v == -2:
+                return False, "-2  canal invalido"
+            return True, "%d  (%.3f V a 3.3 V)" % (v, v * 3.3 / 4095.0)
+        return True, line
+
+
+class Wire:
+
+    def __init__(self, port=None, baud=BAUD, timeout=1.0, boot_delay=2.0, transport=None):
+        self.timeout = timeout
+        if transport is not None:
+            self.s = transport
+            return
+        if serial is None:
+            raise RuntimeError("Falta pyserial.")
+        self.s = serial.Serial(port, baud, timeout=timeout, write_timeout=2)
+        time.sleep(boot_delay)
+        self.s.reset_input_buffer()
+
+    def close(self):
+        try:
+            self.s.close()
+        except Exception:
+            pass
+
+    def _read_n(self, n):
+        buf = bytearray()
+        end = time.time() + self.timeout
+        while len(buf) < n and time.time() < end:
+            chunk = self.s.read(n - len(buf))
+            if chunk:
+                buf += chunk
+        return bytes(buf)
+
+    def _read_line(self):
+        buf = bytearray()
+        end = time.time() + self.timeout
+        while time.time() < end:
+            c = self.s.read(1)
+            if c:
+                buf += c
+                if c == b"\n":
+                    break
+        return bytes(buf)
+
+    def txrx(self, frame, kind):
+        self.s.reset_input_buffer()
+        t0 = time.time()
+        self.s.write(frame)
+        rx = self._read_n(2) if kind in ("ack", "dig") else self._read_line()
+        return Result(frame, rx, kind, (time.time() - t0) * 1000.0)
+
+    def cmd(self, name, args=(), text=None, text2=""):
+        return self.txrx(build(name, args, text, text2), REPLY[name])
+
+    def identity(self):
+        r = self.cmd("id")
+        ok, line = r.verdict()
+        if not ok:
+            return None
+        p = line.split(",")
+        if len(p) < 5 or p[0] != "LV":
+            return {"raw": line}
+        d = {"raw": line, "variant": p[1], "version": p[2], "mac": p[3], "board": p[4],
+             "online": p[1].endswith("-ONLINE")}
+        names = ["di", "do", "ai", "ao", "pwm", "servo", "neo"]
+        d["n"] = {}
+        for i, nm in enumerate(names):
+            try:
+                d["n"][nm] = int(p[5 + i])
+            except (IndexError, ValueError):
+                d["n"][nm] = None
+        return d
+
+
+
+PASS, FAIL = 0, 0
+VISUAL = []
+
+
+def ok(label, good, detail=""):
+    global PASS, FAIL
+    print("  %-40s %s %s" % (label, "OK   " if good else "FALLO", detail))
+    if good:
+        PASS += 1
+    else:
+        FAIL += 1
+    return good
+
+
+def look(msg):
+    if msg not in VISUAL:
+        VISUAL.append(msg)
+    print("     >> MIRA LA TARJETA: %s" % msg)
+
+
+def acked(w, name, args=(), **kw):
+    r = w.cmd(name, args, **kw)
+    return r.rx == b"AA", r
+
+
+def rejected(w, name, args=()):
+    return w.cmd(name, args).rx == b"XX"
+
+
+def run(w, a):
+    print("\n-- identidad --")
+    r = w.cmd("ping")
+    if not ok("ping -> 'A','A'", r.rx == b"AA", repr(r.rx)):
+        print("   La placa no contesta. Revisa el puerto y que tenga el firmware v3.")
+        return
+    ident = w.identity()
+    if not ok("0xEF devuelve LV,...", bool(ident and "board" in ident), ident["raw"] if ident else "sin respuesta"):
+        return
+    n = ident["n"]
+    ok("version 3.x", ident["version"].startswith("3."), ident["version"])
+    print("   placa %s · variante %s · DI%d DO%d AI%d AO%d PWM%d SERVO%d NEO%d" % (
+        ident["board"], ident["variant"], n["di"], n["do"], n["ai"], n["ao"], n["pwm"], n["servo"], n["neo"]))
+
+    print("\n-- canal fuera de rango -> 'X','X' --")
+    ok("DO", rejected(w, "do", (n["do"], 1)))
+    ok("DI", rejected(w, "di", (n["di"],)))
+    ok("AO", rejected(w, "ao", (n["ao"], 1)))
+    ok("PWM", rejected(w, "pwm", (n["pwm"], 1)))
+    ok("SERVO", rejected(w, "servo", (n["servo"], 1)))
+    ok("NEO opcion", rejected(w, "neoopt", (n["neo"],)))
+    r = w.cmd("ai", (n["ai"],))
+    ok("AI -> -2", r.rx.strip() == b"-2", repr(r.rx))
+
+    print("\n-- salida digital (DO) --")
+    if n["do"]:
+        ok("DO %d = 1 / 0" % a.do, acked(w, "do", (a.do, 1))[0] and acked(w, "do", (a.do, 0))[0])
+        look("el pin del canal DO %d se puso en 1 y volvio a 0" % a.do)
+
+    print("\n-- entrada digital (DI) --")
+    if n["di"]:
+        r = w.cmd("di", (0,))
+        ok("DI 0 -> 'A','0'|'1'", r.rx[:1] == b"A" and r.rx[1:2] in (b"0", b"1"), repr(r.rx))
+
+    print("\n-- entrada analogica (AI) --")
+    if n["ai"]:
+        vals = []
+        for _ in range(3):
+            vals.append(int(w.cmd("ai", (a.ai,)).rx.strip() or b"-9"))
+        ok("AI %d dentro de 0..4095 (o -1 ADC2 con WiFi)" % a.ai,
+           all(-1 <= v <= 4095 for v in vals), str(vals))
+
+    print("\n-- DAC (AO) --")
+    if n["ao"]:
+        ok("AO 0 -> 'A','A'", acked(w, "ao", (0, 128))[0])
+        look("en el canal AO 0 hay ~1.65 V")
+    else:
+        ok("sin DAC: AO 0 -> 'X','X'", rejected(w, "ao", (0, 128)))
+
+    print("\n-- PWM --")
+    if n["pwm"]:
+        good = all(acked(w, "pwm", (a.pwm, d))[0] for d in (0, 128, 255, 0))
+        ok("PWM %d: 0, 128, 255, 0" % a.pwm, good)
+        look("el canal PWM %d cambio de brillo/ancho de pulso" % a.pwm)
+
+    print("\n-- servo --")
+    if n["servo"]:
+        good = all(acked(w, "servo", (a.servo, g))[0] for g in (0, 90, 180))
+        ok("SERVO %d: 0, 90, 180" % a.servo, good)
+        look("el servo del canal %d se movio a 0, 90 y 180" % a.servo)
+
+    print("\n-- NeoPixel --")
+    good = all(acked(w, "neo", c)[0] for c in ((255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 0, 0)))
+    ok("tira completa R,G,B,apagada", good)
+    ok("pixel 0 / pixel 99 invalido", acked(w, "neopx", (0, 0, 40, 0))[0] and rejected(w, "neopx", (99, 1, 1, 1)))
+    if n["neo"] > 1:
+        ok("cambiar al pin 1 y volver", acked(w, "neoopt", (1,))[0] and acked(w, "neo", (0, 0, 40))[0]
+           and acked(w, "neoopt", (0,))[0])
+        look("la tira respondio en sus dos pines de NeoPixel (uno a la vez)")
+    look("la tira NeoPixel mostro rojo, verde y azul")
+    acked(w, "neo", (0, 0, 0))
+
+    print("\n-- robustez --")
+    ok("comando desconocido -> 'X','X'", w.txrx(bytes([0x77]), "ack").rx == b"XX")
+    r = w.txrx(bytes([0x01, 0x00]), "ack")
+    ok("trama incompleta -> 'X','X'", r.rx == b"XX", repr(r.rx))
+    ok("sigue vivo (ping)", w.cmd("ping").rx == b"AA")
+
+
+def probe_main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--port", required=True, help="puerto de la tarjeta, ej. COM5")
+    ap.add_argument("--do", type=int, default=0, help="canal DO de prueba")
+    ap.add_argument("--ai", type=int, default=0, help="canal AI de prueba")
+    ap.add_argument("--pwm", type=int, default=0, help="canal PWM de prueba")
+    ap.add_argument("--servo", type=int, default=0, help="canal servo de prueba")
+    ap.add_argument("--dio", type=int, dest="do", help=argparse.SUPPRESS)
+    ap.add_argument("--adc", type=int, dest="ai", help=argparse.SUPPRESS)
+    ap.add_argument("--peer-port", help=argparse.SUPPRESS)
+    a = ap.parse_args()
+
+    print("=" * 62)
+    print("LV_ESP32 v3 - prueba del protocolo contra la tarjeta real")
+    print("=" * 62)
+    try:
+        w = Wire(a.port, timeout=1.5)
+    except Exception as e:
+        print("\nERROR de puerto: %s" % e)
+        print("Cierra el monitor serie, el IDE o el VI que lo tenga abierto.")
+        sys.exit(2)
+    try:
+        run(w, a)
+    finally:
+        w.close()
+
+    print("\n" + "-" * 62)
+    print("AUTOMATICAS:  pasaron %d   fallaron %d" % (PASS, FAIL))
+    if VISUAL:
+        print("\nDebiste ver esto en la placa:")
+        for v in VISUAL:
+            print("   [ ] %s" % v)
+    print()
+    sys.exit(1 if FAIL else 0)
+
+
+if __name__ == "__main__":
+    probe_main()

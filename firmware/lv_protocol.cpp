@@ -3,6 +3,7 @@
 #include <LiquidCrystal_I2C.h>
 
 #include "lv_hal.h"
+#include "lv_gen.h"
 #ifdef LV_ONLINE
   #include "lv_online.h"
 #endif
@@ -212,7 +213,7 @@ void loop() {
     }
 
     default:
-      nack();
+      if (!lv_genHandle(cmd)) nack();
       break;
   }
 }

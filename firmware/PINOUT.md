@@ -1,4 +1,4 @@
-# LV_ESP32 v3 — Canales y pines por tarjeta
+# LV_ESP32 v3 - Canales y pines por tarjeta
 
 LabVIEW manda el **número de canal**, no el GPIO. Cada canal tiene un rol fijo en cada tarjeta
 (estilo PLC). Un canal fuera de rango responde `'X','X'` (en AI responde `-2`).
@@ -10,6 +10,7 @@ La fuente de verdad es `lv_boards.h`; este archivo es su copia legible.
 | DO   | `0x01 [ch, v]`  | salida digital |
 | AI   | `0x05 [ch]`     | entrada analógica, siempre 0..4095 (línea ASCII). `-1` = no disponible ahora (ADC2 con WiFi), `-2` = canal inválido |
 | AO   | `0x06 [ch, v]`  | DAC real, 0..255 |
+| GEN  | `0xD0 [ch, forma, f3..f0, amp, off, duty]` / `0xD1 [ch]` / `0xD2 [ch]` | generador de funciones sobre el DAC (solo ESP32 Wrover), ver la wiki |
 | PWM  | `0x07 [ch, d]`  | 1 kHz, duty 0..255 |
 | SERVO| `0x08 [ch, ang]`| 50 Hz, 0..180° (pulso 500–2400 µs) |
 | NEO  | `0x0A [opción]` | elige el pin de la tira NeoPixel (16 pixeles). `0x03`/`0x04` no cambian |
@@ -21,9 +22,7 @@ Los canales **DI que comparten pin con AI** (marcados ◆) se pueden leer como d
 se cambia solo en cada lectura. Los pines que dependen de la variante (base / ONLINE) van al final de
 DI y DO, así que los demás números de canal **no cambian** entre variantes.
 
----
-
-## ESP32 Wrover - Welcome Kit UG (WROVER-IE sobre base DevKitC v4) — `esp32:esp32:esp32wrover`
+## ESP32 Wrover - Welcome Kit UG (WROVER-IE sobre base DevKitC v4) - `esp32:esp32:esp32wrover`
 
 | Canal | DI | DO | AI | AO | PWM | SERVO | NEO |
 |------:|----|----|----|----|-----|-------|-----|
@@ -48,11 +47,11 @@ DI y DO, así que los demás números de canal **no cambian** entre variantes.
 - No expuestos en esta placa: GPIO16/17 (PSRAM del WROVER), 6–11 (flash), 1/3 (USB), 34–39 son solo entrada.
 - LEDC: PWM usa canales 0–3, servo 4–7; los timers del LEDC se reparten por pares de canal, así que nunca chocan.
 
-## Arduino Nano ESP32 (ESP32-S3) — `esp32:esp32:nano_nora:PinNumbers=byGPIONumber`
+## Arduino Nano ESP32 (ESP32-S3) - `esp32:esp32:nano_nora:PinNumbers=byGPIONumber`
 
 | Canal | DI | DO | AI | AO | PWM | SERVO | NEO |
 |------:|----|----|----|----|-----|-------|-----|
-| 0 | D0 | D9 | A0 | — | D4 | D7 | **D2** (defecto) |
+| 0 | D0 | D9 | A0 | - | D4 | D7 | **D2** (defecto) |
 | 1 | D1 | D12 ¹ | A1 | | D5 | D8 | D3 |
 | 2 | A0 ◆ | D13 ¹ | A2 | | D6 | | |
 | 3 | A1 ◆ | | A3 | | | | |
@@ -76,7 +75,7 @@ DI y DO, así que los demás números de canal **no cambian** entre variantes.
 
 | Canal | DI | DO | AI | AO | PWM | SERVO | NEO |
 |------:|----|----|----|----|-----|-------|-----|
-| 0 | D2 | D12 | A0 | — | D3 | D9 | **D6** (defecto) |
+| 0 | D2 | D12 | A0 | - | D3 | D9 | **D6** (defecto) |
 | 1 | D4 | D13 | A1 | | D5 | D10 | D8 |
 | 2 | D7 | | A2 | | D11 | | |
 | 3 | A0 ◆ | | A3 | | | | |
@@ -99,7 +98,7 @@ Igual que el Uno, más dos entradas analógicas:
 
 A6/A7 son solo analógicos en el Nano: **no** están en la lista DI. Resto de tablas = Uno.
 
-## Nucleo F303K8 (K8) — `STMicroelectronics:stm32:Nucleo_32:pnum=NUCLEO_F303K8`
+## Nucleo F303K8 (K8) - `STMicroelectronics:stm32:Nucleo_32:pnum=NUCLEO_F303K8`
 
 | Canal | DI | DO | AI | AO | PWM | SERVO | NEO |
 |------:|----|----|----|----|-----|-------|-----|
@@ -114,8 +113,6 @@ A6/A7 son solo analógicos en el Nano: **no** están en la lista DI. Resto de ta
 - **Reservados:** PA2/PA15 (VCP del ST-Link = el puerto del protocolo), PA13/PA14 (SWD),
   PA5/PA6 (unidos a PB7/PB6 por los puentes SB18/SB16), PF0/PF1 (reloj del ST-Link, D7/D8).
 - El DAC necesita `-DHAL_DAC_MODULE_ENABLED` (ya lo pone el catálogo).
-
----
 
 ## Estado de verificación
 
