@@ -1,4 +1,5 @@
-from PyQt5.QtCore import QRectF, Qt, QUrl
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtCore import QRectF
 from PyQt5.QtGui import QColor, QDesktopServices, QPainter, QPixmap
 from PyQt5.QtWidgets import (QApplication, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
                              QPushButton, QVBoxLayout, QWidget)
@@ -6,7 +7,7 @@ from PyQt5.QtWidgets import (QApplication, QHBoxLayout, QLabel, QMainWindow, QMe
 from hub.lang import T
 
 from camilab.config import APP, EXT_PROJ, EXT_VI, WIKI_URL, app_icon, side_image
-from camilab.menus import add_actions, add_examples, add_language, add_theme, add_tools
+from camilab.menus import add_examples, add_language, add_theme, add_tools
 from camilab.tema import TH
 
 SUBTITULO = "Instrumentación de bajo costo · Tesla Lab · Universidad Galileo"
@@ -77,19 +78,22 @@ class Home(QMainWindow):
         self.build_body()
         self.resize(860, 480)
 
-    def actions(self):
-        app = self.app
-        return [(T("Nuevo instrumento") + " (%s)" % EXT_VI, "Ctrl+N", app.new_vi),
-                (T("Nuevo proyecto") + " (%s)" % EXT_PROJ, None, app.new_project),
-                (T("Abrir..."), "Ctrl+O", lambda: app.open_dialog(self)),
-                (T("Asociar archivos .cami / .camp"), None, lambda: app.associate(self))]
-
     def build_menu(self):
         mb = self.menuBar()
+        app = self.app
+
         m = mb.addMenu(T("Archivo"))
-        add_actions(m, self.actions())
+        for texto, tecla, fn in (
+                (T("Nuevo instrumento") + " (%s)" % EXT_VI, "Ctrl+N", app.new_vi),
+                (T("Nuevo proyecto") + " (%s)" % EXT_PROJ, None, app.new_project),
+                (T("Abrir..."), "Ctrl+O", lambda: app.open_dialog(self)),
+                (T("Asociar archivos .cami / .camp"), None, lambda: app.associate(self))):
+            a = m.addAction(texto)
+            if tecla:
+                a.setShortcut(tecla)
+            a.triggered.connect(lambda _c=False, f=fn: f())
         m.addSeparator()
-        add_examples(m, self.app)
+        add_examples(m, app)
         m.addSeparator()
         m.addAction(T("Salir")).triggered.connect(QApplication.closeAllWindows)
 
@@ -106,37 +110,36 @@ class Home(QMainWindow):
         add_language(m, self.app, self)
 
     def build_body(self):
-        logo = QLabel()
-        logo.setPixmap(app_icon().pixmap(72, 72))
-        title = QLabel(APP)
-        title.setObjectName("hometitle")
-        sub = QLabel(T(SUBTITULO))
-        sub.setObjectName("homesub")
-        sub.setWordWrap(True)
+        cuerpo = QWidget()
+        cuerpo.setObjectName("panel")
+        fila = QHBoxLayout(cuerpo)
 
-        left = QVBoxLayout()
-        left.setContentsMargins(36, 0, 12, 0)
-        left.setSpacing(8)
-        left.addStretch(1)
-        for w in (logo, title, sub):
-            left.addWidget(w)
-        left.addSpacing(14)
-        for text, _key, fn in self.actions():
-            b = QPushButton(text)
+        izq = QVBoxLayout()
+        logo = QLabel()
+        logo.setPixmap(app_icon().pixmap(96, 96))
+        titulo = QLabel(APP)
+        titulo.setStyleSheet("font-size:30px;font-weight:bold;")
+        sub = QLabel(T(SUBTITULO))
+        sub.setWordWrap(True)
+        for w in (logo, titulo, sub):
+            izq.addWidget(w)
+        for texto, fn in ((T("Nuevo instrumento") + " (%s)" % EXT_VI, self.app.new_vi),
+                          (T("Nuevo proyecto") + " (%s)" % EXT_PROJ, self.app.new_project),
+                          (T("Abrir..."), lambda: self.app.open_dialog(self)),
+                          (T("Asociar archivos .cami / .camp"),
+                           lambda: self.app.associate(self))):
+            b = QPushButton(texto)
             b.setMinimumHeight(34)
             b.clicked.connect(lambda _c=False, f=fn: f())
-            left.addWidget(b)
-        left.addStretch(1)
-        column = QWidget()
-        column.setLayout(left)
-        column.setFixedWidth(360)
+            izq.addWidget(b)
+        izq.addStretch(1)
 
-        body = QWidget()
-        body.setObjectName("panel")
-        row = QHBoxLayout(body)
-        row.addWidget(column)
-        row.addWidget(SideImage(side_image()), 1)
-        self.setCentralWidget(body)
+        izquierda = QWidget()
+        izquierda.setLayout(izq)
+        izquierda.setFixedWidth(360)
+        fila.addWidget(izquierda)
+        fila.addWidget(SideImage(side_image()), 1)
+        self.setCentralWidget(cuerpo)
 
     def closeEvent(self, e):
         self.app.forget(self)

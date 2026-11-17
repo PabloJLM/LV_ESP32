@@ -2,16 +2,27 @@ import math
 import time
 import traceback
 
-from PyQt5.QtCore import Qt, QThread, QRectF, QPointF, QSize, QTimer, pyqtSignal as Signal
-from PyQt5.QtGui import (QColor, QFont, QPainter, QPen, QPixmap, QPolygonF, QRadialGradient,
-                         QBrush, QIcon, QTextCursor)
-from PyQt5.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QComboBox, QDial,
-                             QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QGroupBox,
-                             QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit,
-                             QProgressBar, QPushButton, QScrollArea, QSizePolicy, QSpinBox,
-                             QToolButton, QVBoxLayout, QWidget)
+try:
+    from PyQt5.QtCore import Qt, QThread, QRectF, QPointF, QSize, QTimer, pyqtSignal as Signal
+    from PyQt5.QtGui import (QColor, QFont, QPainter, QPen,
+                             QPixmap, QPolygonF, QRadialGradient, QBrush, QIcon)
+    from PyQt5.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QComboBox,
+                                 QDial, QDoubleSpinBox, QFileDialog, QFrame,
+                                 QGridLayout, QGroupBox, QHBoxLayout, QLabel,
+                                 QMessageBox, QPushButton, QSizePolicy, QSpinBox,
+                                 QToolButton, QVBoxLayout, QWidget)
+    QT_NAME = "PyQt5"
+except ImportError:
+    from PySide6.QtCore import Qt, QThread, QRectF, QPointF, QSize, QTimer, Signal
+    from PySide6.QtGui import (QColor, QFont, QPainter, QPen,
+                               QPixmap, QPolygonF, QRadialGradient, QBrush, QIcon)
+    from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QComboBox,
+                                   QDial, QDoubleSpinBox, QFileDialog, QFrame,
+                                   QGridLayout, QGroupBox, QHBoxLayout, QLabel,
+                                   QMessageBox, QPushButton, QSizePolicy, QSpinBox,
+                                   QToolButton, QVBoxLayout, QWidget)
+    QT_NAME = "PySide6"
 
-import core
 from hub.dev import DeviceError
 from hub.lang import T
 
@@ -37,19 +48,13 @@ QGroupBox::title   { subcontrol-origin:margin; subcontrol-position:top left;
                      left:4px; padding:0 2px; color:#1a1a1a; font-weight:bold; }
 QGroupBox QLabel#hint, QLabel#hint { color:#4a4a4a; font-size:11px; }
 
-QLabel#title       { font-size:16px; font-weight:bold; }
-QComboBox, QDoubleSpinBox, QSpinBox, QLineEdit, QPlainTextEdit {
+QComboBox, QDoubleSpinBox, QSpinBox {
                      background:#ffffff; color:#111; border:2px solid;
                      border-color:#808080 #f4f4f4 #f4f4f4 #808080;
                      padding:2px 4px; min-height:18px; }
 QComboBox QAbstractItemView { background:#ffffff; color:#111;
                      selection-background-color:#1a7a1a; selection-color:#fff; }
-QComboBox:disabled, QDoubleSpinBox:disabled, QSpinBox:disabled, QLineEdit:disabled {
-                     color:#888; background:#ececec; }
-QPlainTextEdit     { font-family:"Consolas","DejaVu Sans Mono","Courier New",monospace; }
-QProgressBar       { background:#ffffff; color:#111; border:2px solid; text-align:center;
-                     border-color:#808080 #f4f4f4 #f4f4f4 #808080; max-height:16px; }
-QProgressBar::chunk { background:#1a7a1a; }
+QComboBox:disabled, QDoubleSpinBox:disabled, QSpinBox:disabled { color:#888; background:#ececec; }
 
 QPushButton        { background:#dcdcdc; color:#111; border:2px solid;
                      border-color:#ffffff #707070 #707070 #ffffff; padding:4px 12px; }
@@ -184,36 +189,6 @@ def hint(text):
     l.setObjectName("hint")
     l.setWordWrap(True)
     return l
-
-
-def padded(widget):
-    h = QHBoxLayout()
-    h.setContentsMargins(8, 0, 8, 0)
-    h.addWidget(widget)
-    return h
-
-
-def set_status(label, text, kind=""):
-    label.setText(text)
-    label.setProperty("kind", kind)
-    label.style().unpolish(label)
-    label.style().polish(label)
-
-
-def fill_ports(cb, prefer=None, extra=()):
-    ports = core.list_ports()
-    old = prefer or cb.currentData()
-    cb.clear()
-    for p in ports:
-        cb.addItem(p["port"] + ("  -  " + p["label"] if p["label"] else ""), p["port"])
-    for key, text in extra:
-        cb.addItem(text, key)
-    i = cb.findData(old) if old else -1
-    if i < 0 and prefer:
-        cb.insertItem(0, prefer, prefer)
-        i = 0
-    cb.setCurrentIndex(max(0, i))
-    return ports
 
 
 class Led(QWidget):
@@ -521,12 +496,18 @@ class InstrumentWindow(QWidget):
         cf.addWidget(self.btn_run, 1, 4)
         cf.addWidget(self.btn_stop, 1, 5)
         cf.addWidget(self.btn_help, 1, 6)
-        root.addLayout(padded(ctl))
+        wrap = QHBoxLayout()
+        wrap.setContentsMargins(8, 0, 8, 0)
+        wrap.addWidget(ctl)
+        root.addLayout(wrap)
 
         self.lb_status = QLabel("")
         self.lb_status.setObjectName("status")
         self.lb_status.setWordWrap(True)
-        root.addLayout(padded(self.lb_status))
+        sw = QHBoxLayout()
+        sw.setContentsMargins(8, 0, 8, 0)
+        sw.addWidget(self.lb_status)
+        root.addLayout(sw)
 
         self.btn_run.clicked.connect(self.run)
         self.btn_stop.clicked.connect(self.stop)
@@ -576,7 +557,10 @@ class InstrumentWindow(QWidget):
         return self._once
 
     def set_status(self, text, kind=""):
-        set_status(self.lb_status, text, kind)
+        self.lb_status.setText(text)
+        self.lb_status.setProperty("kind", kind)
+        self.lb_status.style().unpolish(self.lb_status)
+        self.lb_status.style().polish(self.lb_status)
 
     def device_changed(self):
         d = self.dev
@@ -729,12 +713,6 @@ def make_icon(kind, size=64):
         f.setPixelSize(int(15 * s))
         p.setFont(f)
         p.drawText(QRectF(16 * s, 20 * s, 32 * s, 28 * s), Qt.AlignCenter, "+ −")
-    elif kind == "pwm":
-        for x0, w in ((10, 8), (28, 14), (46, 4)):
-            p.drawPolyline(QPolygonF([QPointF(x0 * s, 42 * s), QPointF(x0 * s, 22 * s),
-                                      QPointF((x0 + w) * s, 22 * s),
-                                      QPointF((x0 + w) * s, 42 * s)]))
-        p.drawLine(QPointF(8 * s, 42 * s), QPointF(56 * s, 42 * s))
     elif kind == "bode":
         p.drawLine(QPointF(12 * s, 12 * s), QPointF(12 * s, 52 * s))
         p.drawLine(QPointF(12 * s, 52 * s), QPointF(54 * s, 52 * s))

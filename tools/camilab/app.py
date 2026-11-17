@@ -110,7 +110,7 @@ def main():
     app.setApplicationName(APP)
     app.setStyle("Fusion")
     app.setWindowIcon(app_icon())
-    set_theme(cfg_read().get("theme", "dark"))
+    set_theme(cfg_read().get("theme", "light"))
     cami = CamiApp()
     files = [a for a in sys.argv[1:] if not a.startswith("--") and
              a.lower().endswith((EXT_VI, EXT_PROJ))]

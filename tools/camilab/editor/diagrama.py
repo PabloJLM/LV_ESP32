@@ -5,7 +5,7 @@ from hub.lang import T
 
 from camilab.bloques import SPECS
 from camilab.documento import (
-    add_node, add_wire, compute_parents, is_desc, node_size, ports, remove_node)
+    add_node, add_wire, compute_parents, node_size, ports, remove_node)
 from camilab.editor.dialogos import PropDialog
 from camilab.editor.escena import Scene, View
 from camilab.editor.items import (
@@ -69,10 +69,18 @@ class Diagram(QObject):
         k = 0
         cur = par.get(a)
         while cur is not None:
-            if self.doc["nodes"][cur]["type"] == "for" and not is_desc(par, b, cur) and b != cur:
+            if self.doc["nodes"][cur]["type"] == "for" and not self.is_desc(b, cur) and b != cur:
                 k += 1
             cur = par.get(cur)
         return k
+
+    def is_desc(self, nid, sid):
+        cur = self.parent.get(nid)
+        while cur is not None:
+            if cur == sid:
+                return True
+            cur = self.parent.get(cur)
+        return False
 
     def wire_type(self, w):
         t = self.port_type(w["src"][0], w["src"][1], "out")

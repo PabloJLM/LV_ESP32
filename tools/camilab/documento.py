@@ -128,15 +128,6 @@ def rect(node):
     return node["x"], node["y"], w, h
 
 
-def is_desc(parent, nid, sid):
-    cur = parent.get(nid)
-    while cur is not None:
-        if cur == sid:
-            return True
-        cur = parent.get(cur)
-    return False
-
-
 def compute_parents(doc):
     nodes = doc["nodes"]
     structs = [n for n in nodes.values() if SPECS[n["type"]].kind == "struct"]

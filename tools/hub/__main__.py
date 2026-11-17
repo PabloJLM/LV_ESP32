@@ -25,7 +25,7 @@ def main():
     app.setStyle("Fusion")
     hub = Hub(a.port, a.sim, a.tool)
     hub.show()
-    rc = app.exec_()
+    rc = app.exec_() if hasattr(app, "exec_") else app.exec()
     sys.exit(rc)
 
 

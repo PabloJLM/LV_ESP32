@@ -1,10 +1,40 @@
-from hub.dev import GEN_FS, GEN_MIN_PTS, DeviceError, gen_wave
+import math
+
+import hub.lang as hlang
+from hub.dev import GEN_FS, GEN_MIN_PTS, DeviceError
 from hub.lang import T
 from hub.ui import (
     C_CH, C_MARK, InstrumentWindow, Knob, Plot, QButtonGroup, QCheckBox, QHBoxLayout, QLabel,
     QPushButton, QTimer, QVBoxLayout, combo, dspin, eng, group, hint, row, sleep_while)
 
 from hub.instrumentos import COMMON_HELP, perf
+
+_EN = {
+    "Generar en la placa (rápido, solo DAC)": "Generate on the board (fast, DAC only)",
+    "La placa genera la onda sola, sin depender del serial. Necesita el firmware con generador "
+    "y una salida AO.":
+        "The board generates the wave by itself, independent of the serial link. Needs "
+        "firmware with the generator and an AO output.",
+    "La placa no aceptó el generador. Vuelve a cargar el firmware o desmarca 'Generar en la "
+    "placa'.":
+        "The board rejected the generator. Reflash the firmware or untick 'Generate on the "
+        "board'.",
+    "Hardware  ·  f pedida %s  ·  f real %s  ·  %d muestras/s  ·  máx. %s":
+        "Hardware  ·  requested f %s  ·  actual f %s  ·  %d samples/s  ·  max %s",
+    "Generando en la placa (%s)": "Generating on the board (%s)",
+}
+for _k, _v in _EN.items():
+    hlang.EN.setdefault(_k, _v)
+
+
+def wave(shape, ph, duty=0.5):
+    if shape == "sine":
+        return math.sin(2 * math.pi * ph)
+    if shape == "tri":
+        return 1.0 - 4.0 * abs(ph - 0.5)
+    if shape == "square":
+        return 1.0 if ph < duty else -1.0
+    return 2.0 * ph - 1.0
 
 
 class FGen(InstrumentWindow):
@@ -128,7 +158,7 @@ class FGen(InstrumentWindow):
         self.preview()
 
     def value(self, c, ph):
-        v = c["o"] + c["a"] / 2.0 * gen_wave(c["shape"], ph, c["duty"])
+        v = c["o"] + c["a"] / 2.0 * wave(c["shape"], ph, c["duty"])
         return max(0.0, min(c["vmax"], v))
 
     def animate(self):

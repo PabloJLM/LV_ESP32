@@ -88,37 +88,21 @@ class ImageBox(QLabel):
         QLabel.resizeEvent(self, e)
 
 
-class Meter(QWidget):
-    def __init__(self, p, w, h):
+class Gauge(QWidget):
+    def __init__(self, p):
         QWidget.__init__(self)
         self.p = p
         self.v = None
-        self.setMinimumSize(w, h)
+        self.setMinimumSize(90, 80)
 
     def put(self, v):
         self.v = v
         self.update()
 
-    def limits(self):
-        return float(self.p.get("min", 0)), float(self.p.get("max", 10))
-
-    def number(self):
-        v = self.v
-        return v if isinstance(v, (int, float)) and not isinstance(v, bool) and v == v else None
-
-    def readout(self, v):
-        txt = fmt(v, self.p.get("dec", 2)) if v is not None else "---"
-        return txt + " " + self.p.get("units", "")
-
-
-class Gauge(Meter):
-    def __init__(self, p):
-        Meter.__init__(self, p, 90, 80)
-
     def paintEvent(self, _e):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        lo, hi = self.limits()
+        lo, hi = float(self.p.get("min", 0)), float(self.p.get("max", 10))
         s = max(40.0, min(self.width() - 10, (self.height() - 14) / 0.86))
         R = QRectF((self.width() - s) / 2, 6, s, s)
         p.setPen(QPen(TH["lo"], 2))
@@ -139,8 +123,8 @@ class Gauge(Meter):
                 tx, ty = c.x() + math.cos(a) * r * 0.66, c.y() - math.sin(a) * r * 0.66
                 p.drawText(QRectF(tx - 30, ty - 8, 60, 16), Qt.AlignCenter,
                            "%g" % round(lo + (hi - lo) * k / 10.0, 3))
-        v = self.number()
-        if v is not None:
+        v = self.v if isinstance(self.v, (int, float)) and not isinstance(self.v, bool) else None
+        if v is not None and v == v:
             fr = max(0.0, min(1.0, (v - lo) / ((hi - lo) or 1e-12)))
             a = math.radians(225 - 270 * fr)
             p.setPen(QPen(TH["alert"], 3, Qt.SolidLine, Qt.RoundCap))
@@ -152,18 +136,26 @@ class Gauge(Meter):
         f.setBold(True)
         p.setFont(f)
         p.setPen(TH["accent"])
-        p.drawText(QRectF(R.left(), c.y() + r * 0.5, R.width(), r * 0.36), Qt.AlignCenter,
-                   self.readout(v))
+        txt = (fmt(v, self.p.get("dec", 2)) if v is not None else "---") + " " + \
+            self.p.get("units", "")
+        p.drawText(QRectF(R.left(), c.y() + r * 0.5, R.width(), r * 0.36), Qt.AlignCenter, txt)
 
 
-class Bar(Meter):
+class Bar(QWidget):
     def __init__(self, p):
-        Meter.__init__(self, p, 60, 80)
+        QWidget.__init__(self)
+        self.p = p
+        self.v = None
+        self.setMinimumSize(60, 80)
+
+    def put(self, v):
+        self.v = v
+        self.update()
 
     def paintEvent(self, _e):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        lo, hi = self.limits()
+        lo, hi = float(self.p.get("min", 0)), float(self.p.get("max", 10))
         H = self.height() - 30
         bw = min(26, self.width() / 3)
         x = self.width() / 2 - bw / 2 - 14
@@ -171,8 +163,8 @@ class Bar(Meter):
         p.setPen(QPen(TH["lo"], 2))
         p.setBrush(TH["screen"])
         p.drawRect(R)
-        v = self.number()
-        if v is not None:
+        v = self.v if isinstance(self.v, (int, float)) and not isinstance(self.v, bool) else None
+        if v is not None and v == v:
             fr = max(0.0, min(1.0, (v - lo) / ((hi - lo) or 1e-12)))
             p.fillRect(QRectF(R.left() + 2, R.bottom() - 2 - (H - 4) * fr, bw - 4, (H - 4) * fr),
                        TH["signal"])
@@ -190,7 +182,8 @@ class Bar(Meter):
         p.setFont(f)
         p.setPen(TH["accent"])
         p.drawText(QRectF(0, self.height() - 22, self.width(), 20), Qt.AlignCenter,
-                   self.readout(v))
+                   (fmt(v, self.p.get("dec", 2)) if v is not None else "---") + " " +
+                   self.p.get("units", ""))
 
 
 class PItem(QFrame):

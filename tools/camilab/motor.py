@@ -6,7 +6,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from hub.lang import T
 
 from camilab.bloques import SPECS
-from camilab.documento import compute_parents, is_desc
+from camilab.documento import compute_parents
 
 
 class Abort(Exception):
@@ -79,6 +79,14 @@ class Engine(object):
             p = self.parent[nid]
             f = self.nodes[nid].get("frame", 0) if p and self.nodes[p]["type"] == "case" else 0
             self.children.setdefault((p, f), []).append(nid)
+
+    def is_desc(self, nid, sid):
+        cur = self.parent.get(nid)
+        while cur is not None:
+            if cur == sid:
+                return True
+            cur = self.parent.get(cur)
+        return False
 
     def member(self, nid, sid, f):
         cur = nid
@@ -179,7 +187,7 @@ class Engine(object):
         out = []
         for i, w in enumerate(self.wires):
             a, b = w["src"][0], w["dst"][0]
-            if is_desc(self.parent, a, sid) and not is_desc(self.parent, b, sid) and b != sid:
+            if self.is_desc(a, sid) and not self.is_desc(b, sid) and b != sid:
                 out.append(i)
         return out
 

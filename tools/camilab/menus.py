@@ -18,14 +18,6 @@ def _radio(menu, items, actual, al_elegir):
         a.triggered.connect(lambda _c=False, k=clave: al_elegir(k))
 
 
-def add_actions(menu, items):
-    for text, key, fn in items:
-        a = menu.addAction(text)
-        if key:
-            a.setShortcut(key)
-        a.triggered.connect(lambda _c=False, f=fn: f())
-
-
 def add_examples(menu, app):
     sub = menu.addMenu(T("Ejemplos"))
     for name, fn in EXAMPLES:

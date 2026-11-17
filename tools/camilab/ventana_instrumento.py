@@ -9,7 +9,8 @@ from PyQt5.QtWidgets import (
     QMessageBox, QPlainTextEdit, QPushButton, QStackedWidget, QTabWidget, QTextBrowser,
     QVBoxLayout, QWidget)
 
-from hub.lang import T
+import hub.lang as hlang
+from hub.lang import LANGS, T
 
 from camilab.documento import save_json
 from camilab.bloques import SPECS
@@ -17,9 +18,10 @@ from camilab.config import APP, EXT_VI, app_icon
 from camilab.documento import new_doc
 from camilab.editor.diagrama import Diagram
 from camilab.editor.paleta import Palette
-from camilab.menus import add_actions, add_examples, add_language, add_theme
+from camilab.ejemplos import EXAMPLES
 from camilab.motor import EngineThread, RunCtx
 from camilab.panel.panel import Panel, PanelPalette
+from camilab.tema import THEME_NAMES
 
 
 class InstrumentWindow(QMainWindow):
@@ -129,12 +131,19 @@ class InstrumentWindow(QMainWindow):
                 tb.addAction(a)
         mb = self.menuBar()
         m = mb.addMenu(T("Archivo"))
-        add_actions(m, [(T("Nuevo instrumento"), "Ctrl+N", self.app.new_vi),
-                        (T("Nuevo proyecto"), None, self.app.new_project),
-                        (T("Abrir..."), "Ctrl+O", lambda: self.app.open_dialog(self)),
-                        (T("Guardar"), "Ctrl+S", self.save),
-                        (T("Guardar como..."), "Ctrl+Shift+S", self.save_as)])
-        add_examples(m, self.app)
+        for txt, key, fn in ((T("Nuevo instrumento"), "Ctrl+N", lambda: self.app.new_vi()),
+                             (T("Nuevo proyecto"), None, lambda: self.app.new_project()),
+                             (T("Abrir..."), "Ctrl+O", lambda: self.app.open_dialog(self)),
+                             (T("Guardar"), "Ctrl+S", self.save),
+                             (T("Guardar como..."), "Ctrl+Shift+S", self.save_as)):
+            a = m.addAction(txt)
+            if key:
+                a.setShortcut(key)
+            a.triggered.connect(fn)
+        ex = m.addMenu(T("Ejemplos"))
+        for name, fn in EXAMPLES:
+            ex.addAction(T(name)).triggered.connect(lambda _c=False, n=name, f=fn:
+                                                     self.app.open_example(n, f))
         m.addSeparator()
         m.addAction(T("Inicio de CamiLab")).triggered.connect(self.app.show_home)
         m.addAction(T("Cerrar")).triggered.connect(self.close)
@@ -146,13 +155,21 @@ class InstrumentWindow(QMainWindow):
         m.addAction(self.a_stop)
         m = mb.addMenu(T("Ver"))
         m.addAction(self.a_swap)
-        add_theme(m, self.app)
+        th = m.addMenu(T("Tema"))
+        for k, nm in THEME_NAMES:
+            a = th.addAction(T(nm))
+            a.triggered.connect(lambda _c=False, k=k: self.app.apply_theme(k))
         for d in (self.dock_pal, self.dock_help, self.dock_mon):
             m.addAction(d.toggleViewAction())
         m = mb.addMenu(T("Herramientas"))
         m.addAction(T("Asociar archivos .cami / .camp")).triggered.connect(
             lambda: self.app.associate(self))
-        add_language(m, self.app, self)
+        lang = m.addMenu(T("Idioma"))
+        for k, nm in LANGS:
+            a = lang.addAction(nm)
+            a.setCheckable(True)
+            a.setChecked(k == hlang.LANG)
+            a.triggered.connect(lambda _c=False, k=k: self.app.set_lang(k, self))
 
     def tab_changed(self, i):
         self.pal_stack.setCurrentIndex(i)
