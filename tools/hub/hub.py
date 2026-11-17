@@ -1,23 +1,23 @@
 import os
+import subprocess
 import sys
 
-import core
 import hub.cal as cal_mod
 import hub.lang as hlang
-from hub.calwin import CalWin
-from hub.calwin import CalOhm
-from hub.calwin import CalDiv
+from hub.calwin import CalDiv, CalOhm, CalWin
 from hub.dev import DEFAULT_VREF, Device, SimDevice, VREF
 from hub.lang import LANGS, T
 from hub.ui import (
     QApplication, QFrame, QHBoxLayout, QIcon, QLabel, QPushButton, QSS, QSize, QTimer,
-    QToolButton, QVBoxLayout, QWidget, Qt, Runner, combo, group, make_icon)
+    QToolButton, QVBoxLayout, QWidget, Qt, Runner, combo, fill_ports, group, make_icon,
+    padded, set_status)
 
 from hub.instrumentos.bode import Bode
 from hub.instrumentos.digital import DigIn, DigOut
 from hub.instrumentos.dmm import DMM
 from hub.instrumentos.fgen import FGen
 from hub.instrumentos.scope import Scope
+from hub.instrumentos.pwm import PWM
 from hub.instrumentos.vps import VPS
 
 
@@ -26,6 +26,7 @@ TOOLS = [
     ("scope",  "Scope",   T("Osciloscopio"),                Scope,  ("ai",)),
     ("fgen",   "FGEN",    T("Generador de funciones"),      FGen,   ("out",)),
     ("vps",    "VPS",     T("Fuente variable"),             VPS,    ("out",)),
+    ("pwm",    "PWM",     T("Salida PWM"),                  PWM,    ("pwm",)),
     ("bode",   "Bode",    T("Analizador de Bode"),          Bode,   ("out", "ai2")),
     ("digin",  "DigIn",   T("Lector digital"),              DigIn,  ("di",)),
     ("digout", "DigOut",  T("Escritor digital"),            DigOut, ("do",)),
@@ -86,10 +87,7 @@ class Hub(QWidget):
         f.addWidget(self.lb_dev, 1, 1, 1, 5)
         f.addWidget(self.lb_cnt, 2, 1, 1, 5)
         f.setColumnStretch(1, 1)
-        w = QHBoxLayout()
-        w.setContentsMargins(8, 0, 8, 0)
-        w.addWidget(g)
-        root.addLayout(w)
+        root.addLayout(padded(g))
 
         strip = QFrame()
         strip.setObjectName("strip")
@@ -109,19 +107,13 @@ class Hub(QWidget):
             tb.clicked.connect(lambda _c=False, k=key: self.open_tool(k))
             sl.addWidget(tb)
             self.tiles[key] = (tb, needs)
-        w = QHBoxLayout()
-        w.setContentsMargins(8, 0, 8, 0)
-        w.addWidget(strip)
-        root.addLayout(w)
+        root.addLayout(padded(strip))
 
         self.lb_status = QLabel(T("Elige el puerto y presiona Conectar. Sin tarjeta, usa "
                                   "Simulador."))
         self.lb_status.setObjectName("status")
         self.lb_status.setWordWrap(True)
-        w = QHBoxLayout()
-        w.setContentsMargins(8, 0, 8, 0)
-        w.addWidget(self.lb_status)
-        root.addLayout(w)
+        root.addLayout(padded(self.lb_status))
 
         self.btn_scan.clicked.connect(lambda: self.scan())
         self.btn_conn.clicked.connect(self.toggle)
@@ -136,24 +128,15 @@ class Hub(QWidget):
         self._autotool = tool
 
     def scan(self, prefer=None):
-        old = prefer or self.cb_port.currentData()
-        self.cb_port.clear()
-        for p in core.list_ports():
-            self.cb_port.addItem(p["port"] + ("  -  " + p["label"] if p["label"] else ""),
-                                 p["port"])
-        self.cb_port.addItem(T("Simulador (sin tarjeta)"), "SIM")
-        if old:
-            i = self.cb_port.findData(old)
-            if i < 0 and prefer:
-                self.cb_port.insertItem(0, prefer, prefer)
-                i = 0
-            self.cb_port.setCurrentIndex(max(0, i))
+        fill_ports(self.cb_port, prefer, [("SIM", T("Simulador (sin tarjeta)"))])
 
     def set_status(self, text, kind=""):
-        self.lb_status.setText(text)
-        self.lb_status.setProperty("kind", kind)
-        self.lb_status.style().unpolish(self.lb_status)
-        self.lb_status.style().polish(self.lb_status)
+        set_status(self.lb_status, text, kind)
+
+    def conn_button(self, text, kind):
+        self.btn_conn.setText(text)
+        self.btn_conn.setObjectName(kind)
+        self.btn_conn.setStyle(self.btn_conn.style())
 
     def toggle(self):
         if self.dev.connected:
@@ -181,9 +164,7 @@ class Hub(QWidget):
     def _connected(self, dev):
         self.dev = dev
         self.btn_conn.setEnabled(True)
-        self.btn_conn.setText(T("Desconectar"))
-        self.btn_conn.setObjectName("stop")
-        self.btn_conn.setStyle(self.btn_conn.style())
+        self.conn_button(T("Desconectar"), "stop")
         self.lb_dev.setText(dev.describe())
         self.lb_cnt.setText(dev.counts())
         self.setWindowTitle("LV_ESP32 Instrument Launcher - " + dev.board_name)
@@ -207,9 +188,7 @@ class Hub(QWidget):
         self.dev = Device()
         for w in list(self.wins.values()):
             w.device_changed()
-        self.btn_conn.setText(T("Conectar"))
-        self.btn_conn.setObjectName("run")
-        self.btn_conn.setStyle(self.btn_conn.style())
+        self.conn_button(T("Conectar"), "run")
         self.cb_port.setEnabled(True)
         self.lb_dev.setText(T("Sin conexión"))
         self.lb_cnt.setText("")
@@ -228,7 +207,6 @@ class Hub(QWidget):
         for w in list(self.wins.values()):
             w.close()
         self.dev.close()
-        import subprocess
         subprocess.Popen([sys.executable] + args)
         QApplication.quit()
 
@@ -243,7 +221,7 @@ class Hub(QWidget):
                 return False, T("Necesita 2 entradas analógicas")
             if n == "out" and not d.outputs():
                 return False, T("La tarjeta no tiene DAC ni PWM")
-            if n in ("di", "do") and d.n[n] < 1:
+            if n in ("di", "do", "pwm") and d.n[n] < 1:
                 return False, T("La tarjeta no tiene %s") % n.upper()
         return True, ""
 

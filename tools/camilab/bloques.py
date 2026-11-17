@@ -219,6 +219,136 @@ def f_lcd(ctx, node, inp):
     return {"ses": w}
 
 
+def check_online(r):
+    if r.rx[:2] == b"AA":
+        return
+    if r.rx[:2] == b"XX":
+        raise ValueError(T("La tarjeta respondió 'X','X'. Falta el firmware ONLINE, los datos "
+                           "guardados o la conexión WiFi."))
+    raise ValueError(T("Sin respuesta de la tarjeta (timeout)."))
+
+
+def f_neo_px(ctx, node, inp):
+    w = need_ses(inp["ses"])
+    r = w.cmd("neopx", [int(max(0, min(255, num(inp[k])))) for k in ("px", "r", "g", "b")])
+    ctx.log(T("NeoPixel (un píxel)"), r)
+    check_ack(r)
+    return {"ses": w}
+
+
+def f_neo_pin(ctx, node, inp):
+    w = need_ses(inp["ses"])
+    r = w.cmd("neoopt", (int(max(0, min(255, num(inp["opt"])))),))
+    ctx.log(T("Pin de NeoPixel"), r)
+    check_ack(r)
+    return {"ses": w}
+
+
+def f_gen_state(ctx, node, inp):
+    w = need_ses(inp["ses"])
+    r = w.cmd("genst", (int(num(inp["ch"])),))
+    ctx.log(T("Estado del generador DAC"), r)
+    line = r.rx.decode("latin-1").strip()
+    if line == "-2":
+        raise ValueError(T("Esta placa no tiene generador DAC o el canal no existe."))
+    try:
+        on, shape, mhz, fs, fmax = [int(x) for x in line.split(",")]
+    except ValueError:
+        raise ValueError(T("Sin respuesta de la tarjeta (timeout)."))
+    return {"ses": w, "on": bool(on), "shape": float(shape), "freq": mhz / 1000.0,
+            "fs": float(fs), "fmax": fmax / 1000.0}
+
+
+def f_ping(ctx, node, inp):
+    w = need_ses(inp["ses"])
+    r = w.cmd("ping")
+    ctx.log(T("Ping"), r)
+    return {"ses": w, "ok": r.rx[:2] == b"AA", "ms": r.ms}
+
+
+def f_ident(ctx, node, inp):
+    w = need_ses(inp["ses"])
+    r = w.cmd("id")
+    ctx.log(T("Identidad"), r)
+    line = r.rx.decode("latin-1").strip()
+    p = line.split(",")
+    if p[0] != "LV" or len(p) < 5:
+        raise ValueError(T("La tarjeta no respondió con una identidad válida."))
+    counts = []
+    for x in p[5:12]:
+        try:
+            counts.append(float(int(x)))
+        except ValueError:
+            counts.append(float("nan"))
+    return {"ses": w, "line": line, "variant": p[1], "version": p[2], "mac": p[3],
+            "board": p[4], "online": p[1].endswith("-ONLINE"), "counts": counts}
+
+
+def f_wifi_save(ctx, node, inp):
+    w = need_ses(inp["ses"])
+    ssid, pw = str(inp["ssid"]), str(inp["pass"])
+    if not 1 <= len(ssid.encode("utf-8")) <= 32:
+        raise ValueError(T("El SSID debe tener de 1 a 32 caracteres."))
+    if len(pw.encode("utf-8")) > 63:
+        raise ValueError(T("La clave del WiFi puede tener hasta 63 caracteres."))
+    r = w.cmd("wsave", text=ssid, text2=pw)
+    ctx.log(T("Guardar WiFi"), r)
+    check_online(r)
+    return {"ses": w}
+
+
+def f_wifi_connect(ctx, node, inp):
+    w = need_ses(inp["ses"])
+    r = w.cmd("wconn")
+    ctx.log(T("Conectar WiFi"), r)
+    check_online(r)
+    return {"ses": w}
+
+
+def f_wifi_disc(ctx, node, inp):
+    w = need_ses(inp["ses"])
+    r = w.cmd("wdisc")
+    ctx.log(T("Desconectar WiFi"), r)
+    check_online(r)
+    return {"ses": w}
+
+
+def f_wifi_status(ctx, node, inp):
+    w = need_ses(inp["ses"])
+    r = w.cmd("wstat")
+    ctx.log(T("Estado WiFi y FTP"), r)
+    p = r.rx.decode("latin-1").strip().split(",")
+    try:
+        wifi, ip, rssi, ftp, sd = int(p[0]), p[1], int(p[2]), int(p[3]), int(p[4])
+    except (IndexError, ValueError):
+        check_online(r)
+        raise ValueError(T("Respuesta de estado no válida."))
+    wtxt = (T("Apagado"), T("Conectando"), T("Conectado"), T("Falló"))
+    ftxt = (T("Apagado"), T("Activo"), T("Error de SD"))
+    return {"ses": w, "up": wifi == 2, "wifi": wtxt[wifi] if 0 <= wifi < 4 else str(wifi),
+            "ip": ip, "rssi": float(rssi), "ftp_on": ftp == 1,
+            "ftp": ftxt[ftp] if 0 <= ftp < 3 else str(ftp), "sd": float(sd)}
+
+
+def f_ftp_save(ctx, node, inp):
+    w = need_ses(inp["ses"])
+    user, pw = str(inp["user"]), str(inp["pass"])
+    if not (1 <= len(user.encode("utf-8")) <= 32 and 1 <= len(pw.encode("utf-8")) <= 32):
+        raise ValueError(T("Usuario y clave del FTP, de 1 a 32 caracteres cada uno."))
+    r = w.cmd("ftpsave", text=user, text2=pw)
+    ctx.log(T("Guardar FTP"), r)
+    check_online(r)
+    return {"ses": w}
+
+
+def f_ftp_set(ctx, node, inp):
+    w = need_ses(inp["ses"])
+    r = w.cmd("ftp", (1 if boolean(inp["on"]) else 0,))
+    ctx.log(T("FTP y SD"), r)
+    check_online(r)
+    return {"ses": w}
+
+
 SES = ("ses", "ses", None, "sesión")
 CH = ("ch", "num", 0.0, "canal")
 CAT_IO = "LV_ESP32"
@@ -268,6 +398,62 @@ spec("lcd_write", CAT_IO, "LCD", [SES, ("row", "num", 0.0, "fila"), ("col", "num
                                   ("text", "str", "", "texto")],
      [("ses", "ses", "sesión")], f_lcd, [("addr", "num", 39, "Dirección I2C")], kind="io",
      doc="Escribe texto en un LCD I2C de 16x2.")
+
+spec("neo_px", CAT_IO, "NeoPixel (un píxel)",
+     [SES, ("px", "num", 0.0, "píxel"), ("r", "num", 0.0, "R"), ("g", "num", 0.0, "G"),
+      ("b", "num", 0.0, "B")],
+     [("ses", "ses", "sesión")], f_neo_px, kind="io",
+     doc="Pinta un solo píxel de la tira. El píxel va de 0 a 15.")
+spec("neo_pin", CAT_IO, "Pin de NeoPixel", [SES, ("opt", "num", 0.0, "opción")],
+     [("ses", "ses", "sesión")], f_neo_pin, kind="io",
+     doc="Elige a qué pin está conectada la tira. 0 es el pin por defecto y las demás son los "
+         "pines alternativos de la placa. Apaga la tira anterior.")
+spec("gen_state", CAT_IO, "Estado del generador DAC", [SES, CH],
+     [("ses", "ses", "sesión"), ("on", "bool", "activo"), ("shape", "num", "forma"),
+      ("freq", "num", "frecuencia real Hz"), ("fs", "num", "muestras/s"),
+      ("fmax", "num", "frecuencia máx. Hz")], f_gen_state, kind="io",
+     doc="Pregunta a la placa qué está generando. La frecuencia real puede diferir un poco "
+         "de la pedida.")
+
+CAT_DIAG = "Diagnóstico"
+spec("ping", CAT_DIAG, "Ping", [SES],
+     [("ses", "ses", "sesión"), ("ok", "bool", "responde"), ("ms", "num", "latencia ms")],
+     f_ping, kind="io",
+     doc="Manda un ping. No da error si la placa no responde, solo pone 'responde' en falso "
+         "y la latencia es el tiempo de espera.")
+spec("ident", CAT_DIAG, "Identidad", [SES],
+     [("ses", "ses", "sesión"), ("line", "str", "línea completa"), ("variant", "str", "variante"),
+      ("version", "str", "versión"), ("mac", "str", "MAC"), ("board", "str", "placa"),
+      ("online", "bool", "ONLINE"), ("counts", "arr", "canales DI DO AI AO PWM SERVO NEO")],
+     f_ident, kind="io",
+     doc="Lee la identidad del firmware. La MAC solo existe en las variantes ONLINE.")
+
+CAT_NET = "WiFi y FTP"
+spec("wifi_save", CAT_NET, "Guardar WiFi",
+     [SES, ("ssid", "str", "", "SSID"), ("pass", "str", "", "clave")],
+     [("ses", "ses", "sesión")], f_wifi_save, kind="io",
+     doc="Guarda la red WiFi en la memoria de la placa. Solo firmware ONLINE. La clave queda "
+         "escrita en el archivo del instrumento.")
+spec("wifi_connect", CAT_NET, "Conectar WiFi", [SES], [("ses", "ses", "sesión")],
+     f_wifi_connect, kind="io",
+     doc="Empieza a conectar y responde al instante. Hay que consultar 'Estado WiFi y FTP' "
+         "hasta ver conectado. Si en 20 s no conecta, el estado pasa a falló.")
+spec("wifi_disc", CAT_NET, "Desconectar WiFi", [SES], [("ses", "ses", "sesión")],
+     f_wifi_disc, kind="io",
+     doc="Apaga el WiFi y el FTP. El ADC2 vuelve a estar disponible.")
+spec("wifi_status", CAT_NET, "Estado WiFi y FTP", [SES],
+     [("ses", "ses", "sesión"), ("up", "bool", "conectado"), ("wifi", "str", "WiFi"),
+      ("ip", "str", "IP"), ("rssi", "num", "RSSI dBm"), ("ftp_on", "bool", "FTP activo"),
+      ("ftp", "str", "FTP"), ("sd", "num", "SD MB")], f_wifi_status, kind="io",
+     doc="Lee el estado del WiFi y del FTP. La IP es 0.0.0.0 y el RSSI 0 si no hay conexión.")
+spec("ftp_save", CAT_NET, "Guardar FTP",
+     [SES, ("user", "str", "", "usuario"), ("pass", "str", "", "clave")],
+     [("ses", "ses", "sesión")], f_ftp_save, kind="io",
+     doc="Guarda el usuario y la clave del FTP en la placa. De 1 a 32 caracteres cada uno.")
+spec("ftp_set", CAT_NET, "FTP y SD", [SES, ("on", "bool", False, "encender")],
+     [("ses", "ses", "sesión")], f_ftp_set, kind="io",
+     doc="Enciende o apaga el servidor FTP y la tarjeta SD. Necesita el WiFi conectado, los "
+         "datos del FTP guardados y una SD puesta.")
 
 
 def safe_div(a, b):

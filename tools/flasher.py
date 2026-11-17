@@ -6,129 +6,134 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import core
 
 try:
-    from PyQt5.QtCore import Qt, QThread, pyqtSignal as SignalT
-    from PyQt5.QtGui import QFont, QTextCursor
-    from PyQt5.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame,
-                                 QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                                 QPlainTextEdit, QProgressBar, QPushButton,
-                                 QVBoxLayout, QWidget)
-    QT_NAME = "PyQt5"
+    from hub.ui import (QSS, QApplication, QComboBox, QFileDialog, QHBoxLayout, QLabel,
+                        QLineEdit, QPlainTextEdit, QProgressBar, QPushButton, QTextCursor,
+                        QThread, QVBoxLayout, QWidget, Signal, fill_ports, group, hint,
+                        set_status)
 except ImportError:
-    try:
-        from PySide6.QtCore import Qt, QThread, Signal as SignalT
-        from PySide6.QtGui import QFont, QTextCursor
-        from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame,
-                                       QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                                       QPlainTextEdit, QProgressBar, QPushButton,
-                                       QVBoxLayout, QWidget)
-        QT_NAME = "PySide6"
-    except ImportError:
-        sys.stderr.write(
-            "\nFalta la libreria grafica. Instalala en el Python portable:\n\n"
-            "    %s -m pip install PyQt5\n\n" % sys.executable)
-        sys.exit(3)
+    sys.stderr.write("\nFalta la libreria grafica. Instalala en el Python portable:\n\n"
+                     "    %s -m pip install PyQt5\n\n" % sys.executable)
+    sys.exit(3)
 
-
-QSS = """
-/* Paleta tipo LabVIEW: blanco, amarillos calidos y amarillo oscuro.
-   Sin esquinas redondeadas; relieve sobrio. */
-QWidget        { background:#fffdf0; color:#2b2100;
-                 font-family:"Segoe UI","Tahoma","MS Shell Dlg 2",sans-serif;
-                 font-size:12px; }
-QLabel#title   { font-size:15px; font-weight:bold; color:#6b5200;
-                 background:#ffe27a; border-bottom:2px solid #b38600;
-                 padding:6px 8px; }
-QLabel#sub     { color:#5a4600; }
-QLabel#field   { color:#2b2100; }
-
-QComboBox      { background:#ffffff; border:1px solid #b38600;
-                 padding:3px 6px; min-height:18px; }
-QComboBox:focus{ border:1px solid #8a6a00; background:#fffbe0; }
-QComboBox QAbstractItemView { background:#ffffff; border:1px solid #b38600;
-                 selection-background-color:#b38600; selection-color:#ffffff; }
-
-QLineEdit      { background:#ffffff; border:1px solid #b38600; padding:3px 5px; }
-QLineEdit:focus{ border:1px solid #8a6a00; background:#fffbe0; }
-QLineEdit:disabled { background:#f3efd8; color:#8c8466; }
-
-QPushButton    { background:#f7c92b; border:1px solid #8a6a00;
-                 padding:5px 16px; min-width:80px; color:#2b2100; }
-QPushButton:hover    { background:#ffdc5e; border:1px solid #6b5200; }
-QPushButton:pressed  { background:#d9a900; border:1px solid #6b5200; }
-QPushButton:disabled { background:#f3efd8; color:#a39a78; border:1px solid #d6cda6; }
-QPushButton#ghost    { background:#fff3c2; }
-
-QProgressBar   { background:#ffffff; border:1px solid #b38600;
-                 height:16px; text-align:center; color:#2b2100; }
-QProgressBar::chunk { background:#e0a800; }
-
-QPlainTextEdit { background:#ffffff; border:1px solid #b38600;
-                 color:#2b2100; padding:2px; }
-QFrame#sep     { background:#b38600; max-height:1px; border:none; }
-"""
+NO_PORT = "Conecta la tarjeta por USB y presiona Actualizar."
 
 
 class Worker(QThread):
-    line = SignalT(str)
-    step = SignalT(int, str)
-    done = SignalT(bool, str)
+    line = Signal(str)
+    step = Signal(int, str)
+    done = Signal(bool, str)
 
     def __init__(self, fn):
         super().__init__()
-        self._fn = fn
+        self.fn = fn
 
     def run(self):
         try:
-            ok, msg = self._fn(self.line.emit,
-                               lambda p, m: self.step.emit(int(p), m))
+            ok, msg = self.fn(self.line.emit, lambda p, m: self.step.emit(int(p), m))
             self.done.emit(bool(ok), str(msg))
         except Exception as e:
             self.done.emit(False, "Error inesperado: %s" % e)
 
 
+def password():
+    ed = QLineEdit()
+    ed.setEchoMode(QLineEdit.Password)
+    return ed
+
+
 class ToolWindow(QWidget):
-    def __init__(self, title, subtitle):
+    TITLE = ""
+    HINT = ""
+    BOARD = core.DEFAULT_BOARD
+
+    def __init__(self, port=None):
         super().__init__()
         self.worker = None
+        self.inputs = []
+        self.setObjectName("panel")
         self.setStyleSheet(QSS)
+        self.setWindowTitle("LV_ESP32")
         self.setMinimumSize(660, 540)
 
-        self.root = QVBoxLayout(self)
-        self.root.setContentsMargins(24, 20, 24, 20)
-        self.root.setSpacing(14)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(14, 12, 14, 12)
+        root.setSpacing(8)
+        title = QLabel(self.TITLE)
+        title.setObjectName("title")
+        root.addWidget(title)
+        root.addWidget(hint(self.HINT))
 
-        t = QLabel(title);    t.setObjectName("title")
-        s = QLabel(subtitle); s.setObjectName("sub");  s.setWordWrap(True)
-        self.root.addWidget(t)
-        self.root.addWidget(s)
+        box, self.form = group("")
+        self.form.setColumnStretch(1, 1)
+        root.addWidget(box)
+        self.buttons = QHBoxLayout()
+        root.addLayout(self.buttons)
 
-        sep = QFrame(); sep.setObjectName("sep"); sep.setFixedHeight(1)
-        self.root.addWidget(sep)
-
-        self.form = QGridLayout()
-        self.form.setHorizontalSpacing(12)
-        self.form.setVerticalSpacing(10)
-        self.root.addLayout(self.form)
-
-        self.bar = QProgressBar(); self.bar.setRange(0, 100); self.bar.setValue(0)
-        self.root.addWidget(self.bar)
-
+        self.bar = QProgressBar()
         self.status = QLabel("Listo para comenzar")
-        self.status.setObjectName("sub")
+        self.status.setObjectName("status")
         self.status.setWordWrap(True)
-        self.root.addWidget(self.status)
+        self.log = QPlainTextEdit()
+        self.log.setReadOnly(True)
+        root.addWidget(self.bar)
+        root.addWidget(self.status)
+        root.addWidget(self.log, 1)
 
-        self.log = QPlainTextEdit(); self.log.setReadOnly(True)
-        self.log.setFont(QFont("Consolas" if os.name == "nt" else "Monospace", 9))
-        self.root.addWidget(self.log, 1)
+        self.cb_port = QComboBox()
+        self.btn_scan = self.button("Actualizar", lambda: self.scan(), add=False)
+        self.build()
+        self.scan(port)
 
-    def add_row(self, r, label, widget, extra=None):
-        lab = QLabel(label); lab.setObjectName("field")
-        self.form.addWidget(lab, r, 0)
+    def build(self):
+        pass
+
+    def row(self, label, widget, extra=None):
+        r = self.form.rowCount()
+        self.form.addWidget(QLabel(label), r, 0)
         self.form.addWidget(widget, r, 1)
         if extra:
             self.form.addWidget(extra, r, 2)
-        self.form.setColumnStretch(1, 1)
+        self.inputs.append(widget)
+        return widget
+
+    def button(self, text, slot, main=False, add=True):
+        b = QPushButton(text)
+        if main:
+            b.setObjectName("run")
+        b.clicked.connect(slot)
+        if add:
+            self.buttons.addWidget(b)
+        self.inputs.append(b)
+        return b
+
+    def port(self):
+        return self.cb_port.currentData()
+
+    def board(self):
+        return self.BOARD
+
+    def needs_port(self):
+        return True
+
+    def scan(self, prefer=None):
+        ports = core.list_ports()
+        fill_ports(self.cb_port, prefer or core.guess_port(self.board(), ports))
+        if not ports:
+            self.cb_port.addItem("(no hay puertos)", "")
+        self.ports_changed(len(ports))
+
+    def ports_changed(self, n):
+        for i in range(self.buttons.count()):
+            w = self.buttons.itemAt(i).widget()
+            if w:
+                w.setEnabled(n > 0)
+        if n:
+            self.say("%d puerto(s) encontrado(s)." % n)
+        else:
+            self.say(NO_PORT, "err")
+
+    def say(self, text, kind=""):
+        set_status(self.status, text, kind)
 
     def append(self, txt):
         if txt.startswith("\r"):
@@ -138,86 +143,73 @@ class ToolWindow(QWidget):
             c.insertText(txt[1:])
         else:
             self.log.appendPlainText(txt)
-        self.log.verticalScrollBar().setValue(self.log.verticalScrollBar().maximum())
+        sb = self.log.verticalScrollBar()
+        sb.setValue(sb.maximum())
 
     def on_step(self, pct, msg):
         self.bar.setValue(pct)
         if msg:
             self.status.setText(msg)
 
-    def set_status(self, msg, kind="info"):
-        color = {"ok": "#006600", "err": "#a00000", "info": "#5a4600"}[kind]
-        self.status.setStyleSheet("color:%s;" % color)
-        self.status.setText(msg)
-
-    def start(self, fn, busy_widgets):
-        for w in busy_widgets:
+    def start(self, fn):
+        if self.needs_port() and not self.port():
+            self.say("Selecciona un puerto.", "err")
+            return
+        for w in self.inputs:
             w.setEnabled(False)
         self.bar.setValue(0)
         self.log.clear()
-        self.set_status("Trabajando...", "info")
+        self.say("Trabajando...")
         self.worker = Worker(fn)
         self.worker.line.connect(self.append)
         self.worker.step.connect(self.on_step)
-        self.worker.done.connect(lambda ok, m: self._finish(ok, m, busy_widgets))
+        self.worker.done.connect(self.finish)
         self.worker.start()
 
-    def _finish(self, ok, msg, busy_widgets):
-        for w in busy_widgets:
+    def finish(self, ok, msg):
+        for w in self.inputs:
             w.setEnabled(True)
-        self.bar.setValue(100 if ok else self.bar.value())
-        self.set_status(msg, "ok" if ok else "err")
+        if ok:
+            self.bar.setValue(100)
+        self.say(msg, "ok" if ok else "err")
         self.append("\n=== %s ===" % ("OK" if ok else "ERROR"))
         self.append(msg)
 
 
 class FlashWindow(ToolWindow):
-    def __init__(self, board=None, port=None):
-        super().__init__(
-            "Cargar firmware",
-            "Selecciona la placa y el puerto, y presiona Cargar firmware.")
+    TITLE = "Cargar firmware"
+    HINT = "Selecciona la placa y el puerto, y presiona Cargar firmware."
 
+    def __init__(self, board=None, port=None):
+        self.board0 = board
+        super().__init__(port)
+
+    def build(self):
         self.cb_board = QComboBox()
         for k, v in core.BOARDS.items():
             self.cb_board.addItem(v["label"], k)
-        if board:
-            i = self.cb_board.findData(board)
-            if i >= 0:
-                self.cb_board.setCurrentIndex(i)
-        self.add_row(0, "Placa", self.cb_board)
-
-        self.cb_port = QComboBox()
-        self.btn_rescan = QPushButton("Actualizar"); self.btn_rescan.setObjectName("ghost")
-        self.add_row(1, "Puerto", self.cb_port, self.btn_rescan)
-
-        self.ed_file = QLineEdit()
-        self.btn_file = QPushButton("Examinar..."); self.btn_file.setObjectName("ghost")
-        self.add_row(2, "Archivo", self.ed_file, self.btn_file)
-
-        self.btn_go = QPushButton("Cargar firmware")
-        row = QHBoxLayout(); row.addStretch(1); row.addWidget(self.btn_go)
-        self.root.insertLayout(4, row)
-
-        self.btn_rescan.clicked.connect(self.rescan)
-        self.btn_go.clicked.connect(self.go)
-        self.btn_file.clicked.connect(self.pick_file)
-        self.cb_board.currentIndexChanged.connect(lambda _i: self._on_board())
-        self.ed_file.textChanged.connect(lambda _t: self._apply_board())
-        self.ed_file.setText(core.display_path(core.bin_path(self.board())))
-        self.rescan(preferred=port)
+        self.cb_board.setCurrentIndex(max(0, self.cb_board.findData(self.board0)))
+        self.ed_file = QLineEdit(core.display_path(core.bin_path(self.board())))
+        self.row("Placa", self.cb_board)
+        self.row("Puerto", self.cb_port, self.btn_scan)
+        self.row("Archivo", self.ed_file, self.button("Examinar...", self.pick_file, add=False))
+        self.buttons.addStretch(1)
+        self.btn_go = self.button("Cargar firmware", self.go, main=True)
+        self.cb_board.currentIndexChanged.connect(self.board_changed)
+        self.ed_file.textChanged.connect(lambda _t: self.check())
 
     def board(self):
         return self.cb_board.currentData()
 
-    def _needs_port(self):
+    def needs_port(self):
         return core.BOARDS[self.board()].get("needs_port", True)
 
-    def _file_ok(self):
+    def file_ok(self):
         return os.path.isfile(core.resolve_path(self.ed_file.text()))
 
-    def _on_board(self):
+    def board_changed(self, _i):
         self.ed_file.setText(core.display_path(core.bin_path(self.board())))
-        self._apply_board()
+        self.check()
 
     def pick_file(self):
         start = core.resolve_path(self.ed_file.text()) or core.BIN_DIR
@@ -227,238 +219,112 @@ class FlashWindow(ToolWindow):
         if path:
             self.ed_file.setText(core.display_path(os.path.normpath(path)))
 
-    def _apply_board(self):
-        has = bool(self.cb_port.currentData())
-        self.btn_go.setEnabled(has or not self._needs_port())
-        if not self._file_ok():
-            self.set_status("No existe el archivo de firmware. Usa Examinar... "
-                            "o compilalo (%s)." % os.path.join("firmware", "COMPILAR.md"),
-                            "err")
-        elif core.BOARDS[self.board()].get("note"):
-            self.set_status(core.BOARDS[self.board()]["note"], "info")
-        elif not self._needs_port():
-            self.set_status("Esta placa no necesita puerto para cargar.", "info")
+    def check(self):
+        note = core.BOARDS[self.board()].get("note")
+        self.btn_go.setEnabled(bool(self.port()) or not self.needs_port())
+        if not self.file_ok():
+            self.say("No existe el archivo de firmware. Usa Examinar... o compilalo (%s)."
+                     % os.path.join("firmware", "COMPILAR.md"), "err")
+        elif note:
+            self.say(note)
+        elif not self.needs_port():
+            self.say("Esta placa no necesita puerto para cargar.")
 
-    def rescan(self, checked=False, preferred=None):
-        self.cb_port.clear()
-        ports = core.list_ports()
-        if not ports:
-            self.cb_port.addItem("(no hay puertos)", "")
-            if self._needs_port():
-                self.set_status("Conecta la tarjeta por USB y presiona Actualizar.", "err")
-            self._apply_board()
-            return
-        for p in ports:
-            txt = p["port"] + (("  -  " + p["label"]) if p["label"] else "")
-            self.cb_port.addItem(txt, p["port"])
-        target = preferred or core.guess_port(self.board(), ports)
-        if target:
-            i = self.cb_port.findData(target)
-            if i >= 0:
-                self.cb_port.setCurrentIndex(i)
-        self._apply_board()
-        if self._needs_port() and self._file_ok():
-            self.set_status("%d puerto(s) encontrado(s)." % len(ports), "info")
+    def ports_changed(self, n):
+        if self.needs_port():
+            if not n:
+                self.say(NO_PORT, "err")
+            elif self.file_ok():
+                self.say("%d puerto(s) encontrado(s)." % n)
+        self.check()
 
     def go(self):
-        b = self.board()
-        p = self.cb_port.currentData()
-        if not p and self._needs_port():
-            self.set_status("Selecciona un puerto.", "err")
-            return
-        p = p or ""
-
+        b, p = self.board(), self.port() or ""
         f = self.ed_file.text().strip() or None
-        self.start(lambda line, step: core.flash_all(b, p, line, step, bin_file=f),
-                   [self.btn_go, self.btn_rescan, self.btn_file, self.cb_board,
-                    self.cb_port, self.ed_file])
+        self.start(lambda line, step: core.flash_all(b, p, line, step, bin_file=f))
 
 
 class ProbeWindow(ToolWindow):
-    def __init__(self, port=None):
-        super().__init__(
-            "Probar tarjeta",
-            "Manda los comandos del protocolo a la tarjeta y revisa las respuestas.")
+    TITLE = "Probar tarjeta"
+    HINT = "Manda los comandos del protocolo a la tarjeta y revisa las respuestas."
 
-        self.cb_port = QComboBox()
-        self.btn_rescan = QPushButton("Actualizar"); self.btn_rescan.setObjectName("ghost")
-        self.add_row(0, "Puerto", self.cb_port, self.btn_rescan)
-
-        self.ed_dio = QLineEdit("0")
-        self.add_row(1, "Canal DO", self.ed_dio)
-        self.ed_adc = QLineEdit("0")
-        self.add_row(2, "Canal AI", self.ed_adc)
-        self.ed_pwm = QLineEdit("0")
-        self.add_row(3, "Canal PWM", self.ed_pwm)
-        self.ed_peer = QLineEdit("")
-        self.ed_peer.hide()
-
-        self.btn_go = QPushButton("Probar")
-        row = QHBoxLayout(); row.addStretch(1); row.addWidget(self.btn_go)
-        self.root.insertLayout(4, row)
-
-        self.btn_rescan.clicked.connect(self.rescan)
-        self.btn_go.clicked.connect(self.go)
-        self.rescan(preferred=port)
-
-    def rescan(self, checked=False, preferred=None):
-        self.cb_port.clear()
-        ports = core.list_ports()
-        if not ports:
-            self.cb_port.addItem("(no hay puertos)", "")
-            self.set_status("Conecta la tarjeta por USB y presiona Actualizar.", "err")
-            self.btn_go.setEnabled(False)
-            return
-        for p in ports:
-            txt = p["port"] + (("  --  " + p["label"]) if p["label"] else "")
-            self.cb_port.addItem(txt, p["port"])
-        target = preferred or core.guess_port(DEFAULT_BOARD, ports)
-        if target:
-            i = self.cb_port.findData(target)
-            if i >= 0:
-                self.cb_port.setCurrentIndex(i)
-        self.btn_go.setEnabled(True)
-        self.set_status("%d puerto(s) encontrado(s)." % len(ports), "info")
-
-    def _int_or_none(self, text):
-        text = text.strip()
-        if not text:
-            return None
-        try:
-            return int(text)
-        except ValueError:
-            return None
+    def build(self):
+        self.row("Puerto", self.cb_port, self.btn_scan)
+        self.ch = [self.row(t, QLineEdit("0")) for t in ("Canal DO", "Canal AI", "Canal PWM")]
+        self.buttons.addStretch(1)
+        self.button("Probar", self.go, main=True)
 
     def go(self):
-        p = self.cb_port.currentData()
-        if not p:
-            self.set_status("Selecciona un puerto.", "err")
-            return
-        peer = self.ed_peer.text().strip() or None
-        dio, adc, pwm = (self._int_or_none(self.ed_dio.text()),
-                         self._int_or_none(self.ed_adc.text()),
-                         self._int_or_none(self.ed_pwm.text()))
-
-        self.start(lambda line, step: core.run_probe(
-                       p, line, step, peer_port=peer, dio=dio, adc=adc, pwm=pwm),
-                   [self.btn_go, self.btn_rescan, self.cb_port,
-                    self.ed_dio, self.ed_adc, self.ed_pwm, self.ed_peer])
-
-
-DEFAULT_BOARD = core.DEFAULT_BOARD
+        p = self.port()
+        dio, adc, pwm = (int(e.text()) if e.text().strip().isdigit() else None
+                         for e in self.ch)
+        self.start(lambda line, step: core.run_probe(p, line, step, dio=dio, adc=adc,
+                                                     pwm=pwm))
 
 
 class OnlineWindow(ToolWindow):
-    def __init__(self, port=None):
-        super().__init__(
-            "WiFi y FTP",
-            "Conecta el ESP32 (firmware '+ WiFi/FTP') a tu red y publica la SD por FTP. Cierra "
-            "los VIs que usen el puerto.")
+    TITLE = "WiFi y FTP"
+    HINT = ("Conecta el ESP32 (firmware '+ WiFi/FTP') a tu red y publica la SD por FTP. "
+            "Cierra los VIs que usen el puerto.")
+    BOARD = "esp32_wrover_online"
+
+    def build(self):
         self.link = None
-
-        self.cb_port = QComboBox()
-        self.btn_rescan = QPushButton("Actualizar"); self.btn_rescan.setObjectName("ghost")
-        self.add_row(0, "Puerto", self.cb_port, self.btn_rescan)
-
-        self.ed_ssid = QLineEdit()
+        self.row("Puerto", self.cb_port, self.btn_scan)
+        self.ed_ssid = self.row("Red WiFi", QLineEdit())
         self.ed_ssid.setPlaceholderText("nombre de la red WiFi (2.4 GHz)")
-        self.add_row(1, "Red WiFi", self.ed_ssid)
-        self.ed_wpass = QLineEdit(); self.ed_wpass.setEchoMode(QLineEdit.Password)
-        self.add_row(2, "Clave WiFi", self.ed_wpass)
-        self.ed_user = QLineEdit("lv")
-        self.add_row(3, "Usuario FTP", self.ed_user)
-        self.ed_fpass = QLineEdit(); self.ed_fpass.setEchoMode(QLineEdit.Password)
-        self.add_row(4, "Clave FTP", self.ed_fpass)
+        self.ed_wpass = self.row("Clave WiFi", password())
+        self.ed_user = self.row("Usuario FTP", QLineEdit("lv"))
+        self.ed_fpass = self.row("Clave FTP", password())
+        self.button("Estado", lambda: self.run(lambda lk, ln, st: core.online_status(lk, ln)))
+        self.button("Desconectar",
+                    lambda: self.run(lambda lk, ln, st: core.online_disconnect(lk, ln)))
+        self.button("Detener FTP",
+                    lambda: self.run(lambda lk, ln, st: core.online_ftp_stop(lk, ln)))
+        self.buttons.addStretch(1)
+        self.button("Conectar WiFi", self.wifi_on, main=True)
+        self.button("Iniciar FTP", self.ftp_on, main=True)
 
-        self.btn_conn  = QPushButton("Conectar WiFi")
-        self.btn_disc  = QPushButton("Desconectar"); self.btn_disc.setObjectName("ghost")
-        self.btn_fon   = QPushButton("Iniciar FTP")
-        self.btn_foff  = QPushButton("Detener FTP"); self.btn_foff.setObjectName("ghost")
-        self.btn_stat  = QPushButton("Estado");      self.btn_stat.setObjectName("ghost")
-        row = QHBoxLayout()
-        for b in (self.btn_stat, self.btn_disc, self.btn_foff):
-            row.addWidget(b)
-        row.addStretch(1)
-        row.addWidget(self.btn_conn)
-        row.addWidget(self.btn_fon)
-        self.root.insertLayout(4, row)
-
-        self._busy = [self.btn_conn, self.btn_disc, self.btn_fon, self.btn_foff,
-                      self.btn_stat, self.btn_rescan, self.cb_port, self.ed_ssid,
-                      self.ed_wpass, self.ed_user, self.ed_fpass]
-
-        self.btn_rescan.clicked.connect(self.rescan)
-        self.btn_conn.clicked.connect(self.do_connect)
-        self.btn_disc.clicked.connect(
-            lambda: self.run(lambda lk, ln, st: core.online_disconnect(lk, ln)))
-        self.btn_fon.clicked.connect(self.do_ftp_on)
-        self.btn_foff.clicked.connect(
-            lambda: self.run(lambda lk, ln, st: core.online_ftp_stop(lk, ln)))
-        self.btn_stat.clicked.connect(
-            lambda: self.run(lambda lk, ln, st: core.online_status(lk, ln)))
-        self.rescan(preferred=port)
-
-    def _close(self):
+    def close_link(self):
         if self.link is not None:
             self.link.close()
             self.link = None
 
     def closeEvent(self, ev):
-        self._close()
+        self.close_link()
         ev.accept()
 
-    def rescan(self, checked=False, preferred=None):
-        self._close()
-        self.cb_port.clear()
-        ports = core.list_ports()
-        if not ports:
-            self.cb_port.addItem("(no hay puertos)", "")
-            self.set_status("Conecta la tarjeta por USB y presiona Actualizar.", "err")
-            for b in (self.btn_conn, self.btn_disc, self.btn_fon, self.btn_foff, self.btn_stat):
-                b.setEnabled(False)
-            return
-        for p in ports:
-            txt = p["port"] + (("  --  " + p["label"]) if p["label"] else "")
-            self.cb_port.addItem(txt, p["port"])
-        target = preferred or core.guess_port("esp32_wrover_online", ports)
-        if target:
-            i = self.cb_port.findData(target)
-            if i >= 0:
-                self.cb_port.setCurrentIndex(i)
-        for b in (self.btn_conn, self.btn_disc, self.btn_fon, self.btn_foff, self.btn_stat):
-            b.setEnabled(True)
-        self.set_status("%d puerto(s) encontrado(s)." % len(ports), "info")
+    def scan(self, prefer=None):
+        self.close_link()
+        super().scan(prefer)
 
-    def _with_link(self, port, fn, line, step):
+    def with_link(self, port, fn, line, step):
         try:
             if self.link is None or self.link.port != port:
-                self._close()
+                self.close_link()
                 step(5, "Abriendo %s (unos 2 s)..." % port)
                 self.link = core.LvLink(port)
             return fn(self.link, line, step)
         except Exception as e:
-            self._close()
+            self.close_link()
             return False, ("No se pudo usar %s: %s  (¿otro programa o un VI "
                            "tiene el puerto abierto?)" % (port, e))
 
     def run(self, fn):
-        port = self.cb_port.currentData()
-        if not port:
-            self.set_status("Selecciona un puerto.", "err")
-            return
-        self.start(lambda line, step: self._with_link(port, fn, line, step), self._busy)
+        port = self.port()
+        self.start(lambda line, step: self.with_link(port, fn, line, step))
 
-    def do_connect(self):
+    def wifi_on(self):
         ssid, pw = self.ed_ssid.text(), self.ed_wpass.text()
         if not ssid:
-            self.set_status("Escribe el nombre de la red WiFi.", "err")
+            self.say("Escribe el nombre de la red WiFi.", "err")
             return
         self.run(lambda lk, ln, st: core.online_connect(lk, ssid, pw, ln, st))
 
-    def do_ftp_on(self):
+    def ftp_on(self):
         user, pw = self.ed_user.text(), self.ed_fpass.text()
         if not user or not pw:
-            self.set_status("Escribe usuario y clave del FTP.", "err")
+            self.say("Escribe usuario y clave del FTP.", "err")
             return
         self.run(lambda lk, ln, st: core.online_ftp_start(lk, user, pw, ln))
 
@@ -466,39 +332,29 @@ class OnlineWindow(ToolWindow):
 class Launcher(QWidget):
     def __init__(self):
         super().__init__()
+        self.setObjectName("panel")
         self.setStyleSheet(QSS)
-        self.setMinimumSize(460, 280)
+        self.setWindowTitle("LV_ESP32")
+        self.setMinimumSize(420, 240)
         self.kids = []
 
         v = QVBoxLayout(self)
-        v.setContentsMargins(28, 26, 28, 26)
-        v.setSpacing(12)
-
-        t = QLabel("LV_ESP32"); t.setObjectName("title")
-        s = QLabel("Preparar la tarjeta para usarla desde LabVIEW.")
-        s.setObjectName("sub"); s.setWordWrap(True)
-        v.addWidget(t); v.addWidget(s)
-
-        sep = QFrame(); sep.setObjectName("sep"); sep.setFixedHeight(1)
-        v.addWidget(sep)
-        v.addSpacing(6)
-
-        b2 = QPushButton("Cargar firmware")
-        b3 = QPushButton("WiFi y FTP (solo variante ONLINE)")
-        for b in (b2, b3):
-            b.setMinimumHeight(46)
+        v.setContentsMargins(20, 16, 20, 16)
+        v.setSpacing(10)
+        title = QLabel("LV_ESP32")
+        title.setObjectName("title")
+        v.addWidget(title)
+        v.addWidget(hint("Preparar la tarjeta para usarla desde LabVIEW."))
+        for text, cls in (("Cargar firmware", FlashWindow),
+                          ("WiFi y FTP (solo variante ONLINE)", OnlineWindow)):
+            b = QPushButton(text)
+            b.setMinimumHeight(40)
+            b.clicked.connect(lambda _c=False, cls=cls: self.open(cls()))
             v.addWidget(b)
         v.addStretch(1)
-
-        foot = QLabel("Tesla Lab · Universidad Galileo")
-        foot.setObjectName("sub"); foot.setAlignment(Qt.AlignCenter)
-        v.addWidget(foot)
-
-        b2.clicked.connect(lambda: self.open(FlashWindow()))
-        b3.clicked.connect(lambda: self.open(OnlineWindow()))
+        v.addWidget(hint("Tesla Lab · Universidad Galileo"))
 
     def open(self, w):
-        w.setWindowTitle("LV_ESP32")
         w.show()
         self.kids.append(w)
 
@@ -512,7 +368,7 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("LV_ESP32")
-
+    app.setStyle("Fusion")
     if a.tool == "flash":
         w = FlashWindow(a.board, a.port)
     elif a.tool == "probe":
@@ -521,10 +377,8 @@ def main():
         w = OnlineWindow(a.port)
     else:
         w = Launcher()
-
-    w.setWindowTitle("LV_ESP32")
     w.show()
-    sys.exit(app.exec_() if QT_NAME == "PyQt5" else app.exec())
+    sys.exit(app.exec_())
 
 
 if __name__ == "__main__":
