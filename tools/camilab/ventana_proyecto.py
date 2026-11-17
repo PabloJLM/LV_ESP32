@@ -13,6 +13,7 @@ from hub.lang import T
 
 from camilab.documento import save_json
 from camilab.config import APP, EXT_PROJ, EXT_VI, app_icon
+from camilab.menus import add_actions
 from camilab.simulador import FakeSerial
 
 
@@ -124,11 +125,8 @@ class ProjectWindow(QMainWindow):
         lay.addWidget(g)
         mb = self.menuBar()
         m = mb.addMenu(T("Archivo"))
-        for txt, key, fn in ((T("Guardar proyecto"), "Ctrl+S", self.save),
-                             (T("Guardar proyecto como..."), "Ctrl+Shift+S", self.save_as)):
-            a = m.addAction(txt)
-            a.setShortcut(key)
-            a.triggered.connect(fn)
+        add_actions(m, [(T("Guardar proyecto"), "Ctrl+S", self.save),
+                        (T("Guardar proyecto como..."), "Ctrl+Shift+S", self.save_as)])
         m.addAction(T("Inicio de CamiLab")).triggered.connect(self.app.show_home)
         m.addAction(T("Cerrar")).triggered.connect(self.close)
         b1.clicked.connect(self.scan)

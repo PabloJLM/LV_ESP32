@@ -195,6 +195,13 @@ EN = {
     "Fuente B": "Supply B",
     "Tensión": "Voltage",
     "Notas": "Notes",
+    "Salida PWM": "PWM output",
+    "PWM %d": "PWM %d",
+    "Ciclo de trabajo": "Duty cycle",
+    "Dos canales no pueden usar la misma salida.": "Two channels cannot use the same output.",
+    "Salidas en 0 %": "Outputs at 0 %",
+    "La salida PWM es una onda cuadrada. Para obtener una tensión necesita un filtro RC. Al presionar Stop vuelve a 0 %.":
+        "The PWM output is a square wave. To get a voltage it needs an RC filter. Pressing Stop returns it to 0 %.",
     "- apagada -": "- off -",
     "No es fuente de potencia: entrega pocos mA. Para una carga usa un seguidor con op-amp o un transistor. Al presionar Stop vuelve a 0 V.":
         "Not a power supply: it delivers a few mA. For a load use an op-amp follower or a transistor. On Stop it returns to 0 V.",
@@ -260,4 +267,99 @@ EN = {
         "Reads the digital inputs (DI) in binary, decimal and hexadecimal.\n\nSome DI channels share a pin with AI.",
     "Escribe las salidas digitales (DO).\n\nRampa cuenta en binario, Alternado da 1010 / 0101 y Caminar un 1 desplaza un solo bit.\n\nAl presionar Stop las salidas se quedan como están.":
         "Writes the digital outputs (DO).\n\nRamp counts in binary, Alternating gives 1010 / 0101 and Walking 1 shifts a single bit.\n\nOn Stop the outputs stay as they are.",
+    "Calibración": "Calibration",
+    "Canal AI: ganancia y offset (2 puntos)": "AI channel: gain and offset (2 points)",
+    "Vref real (pin 3V3/5V)": "Actual Vref (3V3/5V pin)",
+    "R referencia del óhmetro": "Ohmmeter reference R",
+    "Guardar Vref y Rref": "Save Vref and Rref",
+    "Mide con el multímetro el pin de alimentación y la resistencia Rref.":
+        "Measure the supply pin and the Rref resistor with the multimeter.",
+    "V referencia (punto %d)": "Reference V (point %d)",
+    "Capturar punto %d": "Capture point %d",
+    "%.1f cuentas = %s": "%.1f counts = %s",
+    "Calcular y guardar": "Calculate and save",
+    "Borrar calibración del canal": "Clear channel calibration",
+    "Sin calibrar: se usa Vref / 4095 (nominal).":
+        "Not calibrated: Vref / 4095 (nominal) is used.",
+    "Calibrado el %s:  V = %.6g · cuentas %+.5g V   (ganancia %.4f respecto al nominal)":
+        "Calibrated on %s:  V = %.6g · counts %+.5g V   (gain %.4f vs nominal)",
+    "Sin calibrar: %s   (%.1f cuentas, σ %.2f)": "Uncalibrated: %s   (%.1f counts, σ %.2f)",
+    "Calibrado: %s": "Calibrated: %s",
+    "Midiendo... captura el punto cuando la lectura esté estable.":
+        "Measuring... capture the point when the reading is stable.",
+    "El simulador no se calibra.": "The simulator is not calibrated.",
+    "Conecta una tarjeta real para calibrar.": "Connect a real board to calibrate.",
+    "Presiona Run y espera una lectura estable antes de capturar.":
+        "Press Run and wait for a stable reading before capturing.",
+    "Punto %d capturado.": "Point %d captured.",
+    "Captura los dos puntos antes de calcular.": "Capture both points before calculating.",
+    "La ganancia sale %.2f veces la nominal: revisa los valores de referencia.":
+        "The gain comes out %.2f times the nominal: check the reference values.",
+    "Calibración del canal AI%d guardada.": "AI%d channel calibration saved.",
+    "Calibración del canal AI%d borrada.": "AI%d channel calibration cleared.",
+    "Ese canal no tenía calibración.": "That channel had no calibration.",
+    "Vref y Rref guardados para %s.": "Vref and Rref saved for %s.",
+    "Puntos muy juntos: sepáralos al menos %d cuentas (usa ~10 %% y ~90 %% del rango).":
+        "Points too close: separate them by at least %d counts (use ~10 %% and ~90 %% of the range).",
+    "No se pudo guardar la calibración (sigue activa hasta cerrar el Hub): %s":
+        "Could not save the calibration (still active until the Hub is closed): %s",
+    "Vref fuera de rango (1 a 6 V).": "Vref out of range (1 to 6 V).",
+    "Rref fuera de rango (1 Ω a 10 MΩ).": "Rref out of range (1 Ω to 10 MΩ).",
+    "Calibración borrada.": "Calibration cleared.",
+    "Agregar punto": "Add point",
+    "Capturar": "Capture",
+    "Borrar calibración": "Clear calibration",
+    "Midiendo... captura cada punto cuando la lectura esté estable.":
+        "Measuring... capture each point when the reading is stable.",
+    "Punto capturado: %.1f cuentas.": "Point captured: %.1f counts.",
+    "Captura al menos un punto.": "Capture at least one point.",
+    "Resistencia fuera de rango (1 Ω a 10 MΩ).": "Resistance out of range (1 Ω to 10 MΩ).",
+    "Dos puntos dan casi la misma lectura. Revisa las resistencias.":
+        "Two points give almost the same reading. Check the resistors.",
+    "La lectura debe subir con la resistencia. Revisa valores y conexiones.":
+        "The reading must rise with the resistance. Check values and wiring.",
+    "Ningún punto tiene tensión en el pin para calcular el factor.":
+        "No point has voltage at the pin to compute the factor.",
+    "Factor de sonda fuera de rango (0.5 a 1000).": "Probe factor out of range (0.5 to 1000).",
+    "Calibrar óhmetro": "Calibrate ohmmeter",
+    "Resistencias conocidas": "Known resistors",
+    "Conecta cada resistencia entre el canal y GND y escribe su valor medido. Usa de 3 a 6 puntos, por ejemplo 100, 220, 1k, 4.7k, 10k y 47k.":
+        "Connect each resistor between the channel and GND and type its measured value. Use 3 to 6 points, for example 100, 220, 1k, 4.7k, 10k and 47k.",
+    "Sin tabla: se usa Rref (%s) con el divisor ideal.":
+        "No table: Rref (%s) with the ideal divider is used.",
+    "Tabla guardada el %s con %d puntos.": "Table saved on %s with %d points.",
+    "Tabla del óhmetro guardada con %d puntos.": "Ohmmeter table saved with %d points.",
+    "Fuera de los puntos la curva sigue la pendiente del divisor ideal.":
+        "Outside the points the curve follows the ideal divider slope.",
+    "OL": "OL",
+    "Calibrar divisor (sonda)": "Calibrate divider (probe)",
+    "Puntos de tensión": "Voltage points",
+    "ADVERTENCIA: antes de calibrar verifica el divisor con un multímetro y con el cálculo teórico. Nunca apliques al pin del ADC más que Vref (3.3 V o 5 V). Un divisor mal armado puede dañar la tarjeta.":
+        "WARNING: before calibrating, check the divider with a multimeter and with the theoretical calculation. Never apply more than Vref (3.3 V or 5 V) to the ADC pin. A badly built divider can damage the board.",
+    "Factor teórico (opcional)": "Theoretical factor (optional)",
+    "sin comparar": "not compared",
+    "Aplica cada tensión a la entrada del divisor y mídela con el multímetro. Sugeridas: 0, 3.3, 5, 7 y 15 V. El punto de 0 V solo muestra el offset.":
+        "Apply each voltage to the divider input and measure it with the multimeter. Suggested: 0, 3.3, 5, 7 and 15 V. The 0 V point only shows the offset.",
+    "Sin factor guardado: el Hub usa el factor que escribas a mano en el multímetro.":
+        "No saved factor: the Hub uses the factor you type by hand in the multimeter.",
+    "Factor guardado el %s: %.5g   (%d puntos)": "Factor saved on %s: %.5g   (%d points)",
+    "Pin: %s   (%.1f cuentas, σ %.2f)": "Pin: %s   (%.1f counts, σ %.2f)",
+    "Entrada estimada con el factor guardado: %s": "Input estimated with the saved factor: %s",
+    "Factor %.5g guardado para el canal AI%d.": "Factor %.5g saved for channel AI%d.",
+    "Ningún punto sirve para el factor (0 V o pin saturado).":
+        "No point is usable for the factor (0 V or saturated pin).",
+    "Solo hay un punto con tensión: el factor no se puede comprobar. Agrega más.":
+        "Only one point has voltage: the factor cannot be checked. Add more.",
+    "El factor medido (%.4g) difiere más de 30 %% del teórico (%.4g). Revisa el divisor antes de guardar.":
+        "The measured factor (%.4g) differs by more than 30 %% from the theoretical one (%.4g). Check the divider before saving.",
+    "Offset en 0 V: el pin lee %s.": "Offset at 0 V: the pin reads %s.",
+    "Errores: %s": "Errors: %s",
+    "Generar en la placa (rápido, solo DAC)": "Generate on the board (fast, DAC only)",
+    "La placa genera la onda sola, sin depender del serial. Necesita el firmware con generador y una salida AO.":
+        "The board generates the wave by itself, independent of the serial link. Needs firmware with the generator and an AO output.",
+    "La placa no aceptó el generador. Vuelve a cargar el firmware o desmarca 'Generar en la placa'.":
+        "The board rejected the generator. Reflash the firmware or untick 'Generate on the board'.",
+    "Hardware  ·  f pedida %s  ·  f real %s  ·  %d muestras/s  ·  máx. %s":
+        "Hardware  ·  requested f %s  ·  actual f %s  ·  %d samples/s  ·  max %s",
+    "Generando en la placa (%s)": "Generating on the board (%s)",
 }

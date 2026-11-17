@@ -385,10 +385,88 @@ EN.update({
     "Salida DO0": "DO0 output",
     "DO0 → resistencia de 330 Ω → LED → GND": "DO0 → 330 Ω resistor → LED → GND",
     "AO0 (GPIO26) → AI0 (GPIO36)": "AO0 (GPIO26) → AI0 (GPIO36)",
-    "Se guarda en ~/lv_datos.csv": "Saved to ~/lv_datos.csv",
     "Tira NeoPixel en GPIO25 (ESP32) / D6 (UNO)": "NeoPixel strip on GPIO25 (ESP32) / D6 (UNO)",
     "LM35: 10 mV/°C → °C = 100 × V  ·  Vs a 5 V, salida a AI0":
         "LM35: 10 mV/°C → °C = 100 × V  ·  Vs to 5 V, output to AI0",
+    "Señal de 0 V a Vref en el canal AI elegido":
+        "Signal from 0 V to Vref on the chosen AI channel",
+    "Señal en AI2  ·  DO0 se enciende cuando el voltaje pasa el umbral":
+        "Signal on AI2  ·  DO0 turns on when the voltage passes the threshold",
+    "Señal en AI2  ·  y = y + α · (x − y)":
+        "Signal on AI2  ·  y = y + α · (x − y)",
+    "Señal en AI2  ·  Se guarda en ~/lv_datos.csv":
+        "Signal on AI2  ·  Saved to ~/lv_datos.csv",
+    "Señal en AI2  ·  En automático DO0 se enciende si pasa de 1.65 V":
+        "Signal on AI2  ·  In automatic DO0 turns on above 1.65 V",
+    "NeoPixel (un píxel)": "NeoPixel (one pixel)",
+    "Pin de NeoPixel": "NeoPixel pin",
+    "Estado del generador DAC": "DAC generator status",
+    "Guardar WiFi": "Save WiFi",
+    "Conectar WiFi": "Connect WiFi",
+    "Desconectar WiFi": "Disconnect WiFi",
+    "Estado WiFi y FTP": "WiFi and FTP status",
+    "Guardar FTP": "Save FTP",
+    "FTP y SD": "FTP and SD",
+    "Apagado": "Off",
+    "Conectando": "Connecting",
+    "Conectado": "Connected",
+    "Falló": "Failed",
+    "Activo": "Active",
+    "Error de SD": "SD error",
+    "La tarjeta respondió 'X','X'. Falta el firmware ONLINE, los datos guardados o la conexión WiFi.":
+        "The board answered 'X','X'. The ONLINE firmware, the saved data or the WiFi connection is missing.",
+    "Esta placa no tiene generador DAC o el canal no existe.":
+        "This board has no DAC generator or the channel does not exist.",
+    "La tarjeta no respondió con una identidad válida.":
+        "The board did not answer with a valid identity.",
+    "El SSID debe tener de 1 a 32 caracteres.": "The SSID must be 1 to 32 characters long.",
+    "La clave del WiFi puede tener hasta 63 caracteres.":
+        "The WiFi password can be up to 63 characters long.",
+    "Usuario y clave del FTP, de 1 a 32 caracteres cada uno.":
+        "FTP user and password, 1 to 32 characters each.",
+    "Respuesta de estado no válida.": "Invalid status answer.",
+    "Pinta un solo píxel de la tira. El píxel va de 0 a 15.":
+        "Sets a single pixel of the strip. The pixel goes from 0 to 15.",
+    "píxel": "pixel",
+    "opción": "option",
+    "Elige a qué pin está conectada la tira. 0 es el pin por defecto y las demás son los pines alternativos de la placa. Apaga la tira anterior.":
+        "Chooses which pin the strip is connected to. 0 is the default pin and the others are the alternative pins of the board. It turns off the previous strip.",
+    "Pregunta a la placa qué está generando. La frecuencia real puede diferir un poco de la pedida.":
+        "Asks the board what it is generating. The actual frequency can differ a little from the requested one.",
+    "activo": "active",
+    "forma": "shape",
+    "frecuencia real Hz": "actual frequency Hz",
+    "muestras/s": "samples/s",
+    "frecuencia máx. Hz": "max frequency Hz",
+    "Diagnóstico": "Diagnostics",
+    "responde": "answers",
+    "latencia ms": "latency ms",
+    "Manda un ping. No da error si la placa no responde, solo pone 'responde' en falso y la latencia es el tiempo de espera.":
+        "Sends a ping. It gives no error if the board does not answer, it only sets 'answers' to false and the latency is the wait time.",
+    "Lee la identidad del firmware. La MAC solo existe en las variantes ONLINE.":
+        "Reads the firmware identity. The MAC only exists in the ONLINE variants.",
+    "línea completa": "full line",
+    "variante": "variant",
+    "versión": "version",
+    "canales DI DO AI AO PWM SERVO NEO": "channels DI DO AI AO PWM SERVO NEO",
+    "Guarda la red WiFi en la memoria de la placa. Solo firmware ONLINE. La clave queda escrita en el archivo del instrumento.":
+        "Saves the WiFi network in the board memory. ONLINE firmware only. The password stays written in the instrument file.",
+    "WiFi y FTP": "WiFi and FTP",
+    "clave": "password",
+    "Empieza a conectar y responde al instante. Hay que consultar 'Estado WiFi y FTP' hasta ver conectado. Si en 20 s no conecta, el estado pasa a falló.":
+        "Starts connecting and answers right away. Check 'WiFi and FTP status' until it shows connected. If it does not connect in 20 s, the state becomes failed.",
+    "Apaga el WiFi y el FTP. El ADC2 vuelve a estar disponible.":
+        "Turns off the WiFi and the FTP. ADC2 becomes available again.",
+    "Lee el estado del WiFi y del FTP. La IP es 0.0.0.0 y el RSSI 0 si no hay conexión.":
+        "Reads the WiFi and FTP status. The IP is 0.0.0.0 and the RSSI 0 if there is no connection.",
+    "conectado": "connected",
+    "FTP activo": "FTP active",
+    "Guarda el usuario y la clave del FTP en la placa. De 1 a 32 caracteres cada uno.":
+        "Saves the FTP user and password on the board. 1 to 32 characters each.",
+    "usuario": "user",
+    "Enciende o apaga el servidor FTP y la tarjeta SD. Necesita el WiFi conectado, los datos del FTP guardados y una SD puesta.":
+        "Turns the FTP server and the SD card on or off. It needs the WiFi connected, the FTP data saved and an SD card inserted.",
+    "encender": "turn on",
 })
 
 

@@ -30,8 +30,8 @@ class ExB(object):
     def w(self, a, ap, b, bp, frame=0):
         add_wire(self.doc, a, ap, b, bp, frame)
 
-    def text(self, txt, x, y, size=11):
-        self.doc["panel"]["texts"].append({"x": x, "y": y, "text": T(txt), "size": size})
+    def note(self, txt):
+        self.doc["panel"]["footer"] = {"on": True, "text": T(txt), "image": None}
 
     def loop_end(self, loop, x, y, ms, sx, sy, cell):
         k = self.c(ms, x, y)
@@ -58,11 +58,12 @@ def ex_voltage():
     b.w(ai, "volts", num, "v")
     b.w(ai, "volts", ch1, "v")
     b.w(ai, "ses", cl, "ses")
+    b.note("Señal de 0 V a Vref en el canal AI elegido")
     return b.doc
 
 
 def ex_led():
-    b = ExB("Prender un LED", 2, 3)
+    b = ExB("Prender un LED", 1, 3)
     op = b.n("open", 20, 150)
     lp = b.n("while", 200, 60, w=520, h=320)
     sw = b.n("ctl_bool", 240, 120, cell=(0, 0), label="LED en DO0")
@@ -76,7 +77,7 @@ def ex_led():
     b.w(sw, "v", do, "val")
     b.w(sw, "v", led, "v")
     b.w(do, "ses", cl, "ses")
-    b.text("DO0 → resistencia de 330 Ω → LED → GND", 0.05, 0.75)
+    b.note("DO0 → resistencia de 330 Ω → LED → GND")
     return b.doc
 
 
@@ -109,6 +110,7 @@ def ex_alarm():
     b.w(do, "ses", cl, "ses")
     b.doc["panel"]["rows"] = 4
     b.doc["panel"]["items"][vc] = {"r": 0, "c": 1, "rs": 4, "cs": 3}
+    b.note("Señal en AI2  ·  DO0 se enciende cuando el voltaje pasa el umbral")
     return b.doc
 
 
@@ -135,8 +137,7 @@ def ex_lm35():
         b.w(sc, "r", t, "v")
     b.w(ai, "ses", cl, "ses")
     b.doc["panel"]["items"][tb] = {"r": 0, "c": 1, "rs": 2, "cs": 1}
-    b.doc["panel"]["footer"] = {"on": True, "text": T("LM35: 10 mV/°C → °C = 100 × V  ·  "
-                                                      "Vs a 5 V, salida a AI0"), "image": None}
+    b.note("LM35: 10 mV/°C → °C = 100 × V  ·  Vs a 5 V, salida a AI0")
     return b.doc
 
 
@@ -169,6 +170,7 @@ def ex_filter():
     b.w(ad, "r", lp, "sr0_r")
     b.w(ad, "r", flt, "v")
     b.w(ai, "ses", cl, "ses")
+    b.note("Señal en AI2  ·  y = y + α · (x − y)")
     return b.doc
 
 
@@ -185,6 +187,7 @@ def ex_sweep():
     wt = b.n("wait", 460, 256)
     k1 = b.c(0, 560, 210)
     ai = b.n("ai_read", 600, 100)
+    vn = b.n("ind_num", 690, 200, cell=(1, 0), label="Voltaje", units="V")
     gr = b.n("ind_graph", 860, 120, cell=(0, 1, 2, 3), label="Voltaje leído vs paso")
     cl = b.n("close", 860, 220)
     b.w(n, "v", lp, "N")
@@ -197,8 +200,9 @@ def ex_sweep():
     b.w(ao, "ses", ai, "ses")
     b.w(k1, "v", ai, "ch")
     b.w(ai, "volts", gr, "v")
+    b.w(ai, "volts", vn, "v")
     b.w(ai, "ses", cl, "ses")
-    b.text("AO0 (GPIO26) → AI0 (GPIO36)", 0.02, 0.6)
+    b.note("AO0 (GPIO26) → AI0 (GPIO36)")
     return b.doc
 
 
@@ -209,6 +213,7 @@ def ex_logger():
     ch = b.c(2, 230, 150)
     ai = b.n("ai_read", 290, 120)
     cs = b.n("csv_write", 560, 110, path="~/lv_datos.csv")
+    vn = b.n("ind_num", 560, 240, cell=(0, 0), label="Voltaje", units="V")
     gc = b.n("ind_chart", 560, 180, cell=(0, 1, 2, 3), label="Datos guardados")
     b.loop_end(lp, 240, 300, 500, 640, 300, (1, 0))
     cl = b.n("close", 780, 150)
@@ -216,8 +221,9 @@ def ex_logger():
     b.w(ch, "v", ai, "ch")
     b.w(ai, "volts", cs, "v")
     b.w(ai, "volts", gc, "v")
+    b.w(ai, "volts", vn, "v")
     b.w(ai, "ses", cl, "ses")
-    b.text("Se guarda en ~/lv_datos.csv", 0.02, 0.2)
+    b.note("Señal en AI2  ·  Se guarda en ~/lv_datos.csv")
     return b.doc
 
 
@@ -233,9 +239,10 @@ def ex_case():
     gt = b.n("gt", 560, 220, frame=1)
     mn = b.n("ctl_bool", 520, 240, frame=0, cell=(0, 1), label="Manual")
     led = b.n("ind_led", 780, 200, cell=(0, 2), label="Salida DO0")
+    sg = b.n("ind_chart", 470, 80, cell=(1, 0, 1, 4), label="Señal")
     k0 = b.c(0, 770, 300)
     do = b.n("do_write", 780, 250)
-    b.loop_end(lp, 240, 410, 100, 860, 420, (1, 3))
+    b.loop_end(lp, 240, 410, 100, 860, 420, (0, 3))
     cl = b.n("close", 1000, 150)
     b.w(op, "ses", ai, "ses")
     b.w(ch, "v", ai, "ch")
@@ -249,23 +256,25 @@ def ex_case():
     b.w(k0, "v", do, "ch")
     b.w(ai, "ses", do, "ses")
     b.w(do, "ses", cl, "ses")
+    b.w(ai, "volts", sg, "v")
+    b.note("Señal en AI2  ·  En automático DO0 se enciende si pasa de 1.65 V")
     return b.doc
 
 
 def ex_color():
-    b = ExB("Color en NeoPixel", 2, 3)
+    b = ExB("Color en NeoPixel", 1, 2)
     op = b.n("open", 20, 150)
     lp = b.n("while", 200, 60, w=460, h=300)
     col = b.n("ctl_color", 240, 120, cell=(0, 0), label="Color")
     neo = b.n("neo_all", 360, 110)
-    b.loop_end(lp, 240, 300, 100, 560, 300, (0, 2))
+    b.loop_end(lp, 240, 300, 100, 560, 300, (0, 1))
     cl = b.n("close", 720, 150)
     b.w(op, "ses", neo, "ses")
     b.w(col, "r", neo, "r")
     b.w(col, "g", neo, "g")
     b.w(col, "b", neo, "b")
     b.w(neo, "ses", cl, "ses")
-    b.text("Tira NeoPixel en GPIO25 (ESP32) / D6 (UNO)", 0.05, 0.7)
+    b.note("Tira NeoPixel en GPIO25 (ESP32) / D6 (UNO)")
     return b.doc
 
 
