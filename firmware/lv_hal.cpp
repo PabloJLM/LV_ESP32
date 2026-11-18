@@ -113,8 +113,7 @@ int16_t lv_aRead(uint8_t ch) {
   return (int16_t)analogRead(pin);
 #elif defined(LV_ARCH_AVR)
   (void)analogRead(pin);
-  uint16_t v = (uint16_t)analogRead(pin);
-  return (int16_t)(((uint32_t)v * 4095u) / 1023u);
+  return (int16_t)analogRead(pin);
 #else
   (void)analogRead(pin);
   return (int16_t)analogRead(pin);
