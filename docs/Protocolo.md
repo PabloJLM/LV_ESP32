@@ -69,7 +69,7 @@ Notas de los ejemplos.
 | `0x02` | Digital read | canal, relleno | DIG o NACK | Manda 2 bytes de parámetro, pero solo el primero es el canal. El segundo se lee y se ignora. El pin pasa a entrada |
 | `0x03` | NeoPixel todos | r, g, b | ACK | Pinta los 16 píxeles. Siempre ACK si recibió los 3 bytes |
 | `0x04` | NeoPixel uno | píxel, r, g, b | ACK o NACK | NACK si el píxel es 16 o más |
-| `0x05` | Analog read | canal | INT | 0 a 4095 en todas las placas. En Uno y Nano se escala desde 10 bits. `-1` si el canal es ADC2 y el WiFi está activo. `-2` si el canal no existe o hubo timeout |
+| `0x05` | Analog read | canal | INT | Cuentas en la resolución nativa de la placa, sin escalar: 0 a 1023 en Uno y Nano (10 bits), 0 a 4095 en ESP32 y Nucleo (12 bits). `-1` si el canal es ADC2 y el WiFi está activo. `-2` si el canal no existe o hubo timeout |
 | `0x06` | Analog write (DAC) | canal, valor 0 a 255 | ACK o NACK | NACK en placas sin DAC y en ESP32 que no sean el ESP32 clásico |
 | `0x07` | PWM | canal, duty 0 a 255 | ACK o NACK | En ESP32 es 1 kHz y 8 bits. NACK si no se puede asignar el canal LEDC |
 | `0x08` | Servo | canal, ángulo | ACK o NACK | El ángulo se recorta a 180. Pulso de 500 a 2400 us, 50 Hz |
