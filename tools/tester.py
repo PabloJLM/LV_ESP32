@@ -94,7 +94,7 @@ ONLINE = [("Conectar", "wconn"), ("Estado", "wstat"), ("Desconectar", "wdisc"),
 def gui(a):
     from hub.ui import (QSS, QApplication, QComboBox, QFileDialog, QGroupBox, QHBoxLayout,
                         QLabel, QLineEdit, QPlainTextEdit, QPushButton, QScrollArea, QTimer,
-                        QVBoxLayout, QWidget, Qt, ispin, set_status)
+                        QVBoxLayout, QWidget, Qt, app_icon, ispin, set_status)
 
     class Win(QWidget):
         def __init__(self):
@@ -326,6 +326,7 @@ def gui(a):
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+    app.setWindowIcon(app_icon("tester"))
     w = Win()
     w.show()
     return app.exec_()

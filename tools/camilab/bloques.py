@@ -80,7 +80,7 @@ def check_ack(r):
 
 
 def f_open(ctx, node, inp):
-    port = (node["params"].get("port") or PROJ).strip()
+    port = (inp.get("port") or node["params"].get("port") or PROJ).strip()
     if port == PROJ:
         port = ctx.project_port or "SIM"
     if port.upper() == "SIM":
@@ -146,7 +146,8 @@ def f_ai(ctx, node, inp):
         raise ValueError(T("Canal no disponible ahora (ADC2 ocupado por el WiFi)."))
     if v < 0:
         raise ValueError(T("Canal analógico inválido."))
-    return {"ses": w, "counts": float(v), "volts": v * getattr(w, "vref", 3.3) / 4095.0}
+    return {"ses": w, "counts": float(v),
+            "volts": v * getattr(w, "vref", 3.3) / getattr(w, "adc_max", 4095)}
 
 
 def f_ao(ctx, node, inp):
@@ -353,11 +354,13 @@ SES = ("ses", "ses", None, "sesión")
 CH = ("ch", "num", 0.0, "canal")
 CAT_IO = "LV_ESP32"
 
-spec("open", CAT_IO, "Abrir puerto", [], [("ses", "ses", "sesión"), ("board", "str", "placa")],
+spec("open", CAT_IO, "Abrir puerto", [("port", "str", None, "puerto")],
+     [("ses", "ses", "sesión"), ("board", "str", "placa")],
      f_open, [("port", "port", PROJ, "Puerto")], kind="io",
      doc="Abre el puerto serie de la tarjeta. Cablea su salida 'sesión' a los bloques de E/S: "
          "ese cable marca el orden. SIM es la tarjeta simulada y (proyecto) usa el puerto del "
-         ".camp.")
+         ".camp. Si cableas 'puerto' (por ejemplo con un Selector de puerto), manda sobre la "
+         "propiedad.")
 spec("close", CAT_IO, "Cerrar puerto", [SES], [], f_close, kind="io",
      doc="Cierra el puerto. Ponlo al final, fuera del lazo.")
 spec("do_write", CAT_IO, "Escribir digital", [SES, CH, ("val", "bool", False, "valor")],
@@ -369,7 +372,8 @@ spec("di_read", CAT_IO, "Leer digital", [SES, CH],
 spec("ai_read", CAT_IO, "Leer analógico", [SES, CH],
      [("ses", "ses", "sesión"), ("counts", "num", "cuentas"), ("volts", "num", "voltaje")],
      f_ai, kind="io",
-     doc="Lee una entrada analógica (0 a 4095 cuentas). voltaje = cuentas × Vref / 4095.")
+     doc="Lee una entrada analógica en cuentas de la resolución de la placa (10 bits: 0 a 1023, "
+         "12 bits: 0 a 4095). voltaje = cuentas × Vref / cuentas máx.")
 spec("ao_write", CAT_IO, "Escribir analógico", [SES, CH, ("volts", "num", 0.0, "voltaje")],
      [("ses", "ses", "sesión")], f_ao, kind="io",
      doc="Saca un voltaje por el DAC (8 bits). Solo ESP32 Wrover y Nucleo tienen DAC.")
@@ -475,9 +479,19 @@ def unop(tid, sym, label, f, doc):
     spec(tid, CAT_NUM, label, [A], R, lambda c, n, i, f=f: {"r": f(num(i["a"]))}, sym=sym, doc=doc)
 
 
+def const_rep(v, rep):
+    v = num(v)
+    if rep == "int":
+        return float(int(max(-2147483648, min(2147483647, round(v)))))
+    if rep == "byte":
+        return float(int(max(0, min(255, round(v)))))
+    return v
+
+
 spec("const_num", CAT_NUM, "Constante numérica", [], [("v", "num", "valor")],
-     lambda c, n, i: {"v": num(n["params"].get("value", 0))},
-     [("value", "num", 0.0, "Valor")], kind="const",
+     lambda c, n, i: {"v": const_rep(n["params"].get("value", 0), n["params"].get("rep"))},
+     [("value", "num", 0.0, "Valor"), ("rep", "rep", "double", "Representación")],
+     kind="const",
      doc="Un número fijo. Doble clic para cambiarlo.")
 binop("add", "+", "Suma", lambda a, b: a + b, "x + y")
 binop("sub", "−", "Resta", lambda a, b: a - b, "x − y")
@@ -624,8 +638,8 @@ spec("while", CAT_STRUCT, "While Loop", kind="struct",
 spec("for", CAT_STRUCT, "For Loop", kind="struct",
      doc="Repite N veces, 'i' va de 0 a N−1. Lo que sale del lazo se junta en un arreglo.")
 spec("case", CAT_STRUCT, "Case (if)", kind="struct",
-     doc="Ejecuta uno de sus dos casos según '?'. Con clic derecho → 'Agregar salida' sacas "
-         "valores: cabléala en los dos casos.")
+     doc="Ejecuta un caso según '?'. Con un booleano usa Falso y Verdadero, con un número el "
+         "caso de ese índice (fuera de rango usa el 0). Clic derecho para agregar casos y salidas.")
 
 def f_ctl(ctx, node, inp):
     v = ctx.ctl(node["id"])
@@ -649,15 +663,23 @@ CTL_KINDS = [
     ("ctl_color", "Selector de color", [("r", "num", "R"), ("g", "num", "G"), ("b", "num", "B")]),
     ("ctl_bool", "Interruptor", [("v", "bool", "valor")]),
     ("ctl_stop", "Botón Stop", [("v", "bool", "valor")]),
+    ("ctl_port", "Selector de puerto", [("v", "str", "puerto")]),
+    ("ctl_arr_num", "Arreglo numérico", [("v", "arr", "arreglo")]),
+    ("ctl_arr_bool", "Arreglo booleano", [("v", "arr", "arreglo")]),
+    ("ctl_arr_str", "Arreglo de texto", [("v", "arr", "arreglo")]),
 ]
 IND_KINDS = [
     ("ind_num", "Pantalla numérica", "num"),
     ("ind_led", "LED", "bool"),
+    ("ind_img", "Imagen (booleano)", "bool"),
     ("ind_gauge", "Gauge", "num"),
     ("ind_bar", "Barra / termómetro", "num"),
     ("ind_chart", "Plot en el tiempo", "any"),
     ("ind_graph", "Gráfica de arreglo", "arr"),
     ("ind_str", "Pantalla de texto", "any"),
+    ("ind_arr_num", "Pantalla de arreglo numérico", "arr"),
+    ("ind_arr_bool", "Pantalla de arreglo booleano", "arr"),
+    ("ind_arr_str", "Pantalla de arreglo de texto", "arr"),
 ]
 CTL_DOC = "Terminal de un control del panel frontal: entrega lo que el usuario pone ahí."
 IND_DOC = "Terminal de un indicador del panel frontal: muestra el valor que le llega."

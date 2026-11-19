@@ -107,9 +107,9 @@ class CalWin(CalBase):
             return
         c = self.hub.cal.channel(d.board, self._ch)
         if c is None:
-            self.lb_cur.setText(T("Sin calibrar: se usa Vref / 4095 (nominal)."))
+            self.lb_cur.setText(T("Sin calibrar: se usa Vref / cuentas máx. (nominal)."))
         else:
-            rel = c["a"] / (d.vref / 4095.0)
+            rel = c["a"] / (d.vref / d.adc_max)
             self.lb_cur.setText(
                 T("Calibrado el %s:  V = %.6g · cuentas %+.5g V   (ganancia %.4f respecto "
                   "al nominal)") % (c.get("date", "?"), c["a"], c["b"], rel))
@@ -147,7 +147,7 @@ class CalWin(CalBase):
         self.last = st
         d = self.dev
         txt = T("Sin calibrar: %s   (%.1f cuentas, σ %.2f)") % (
-            eng(st["c"] * d.vref / 4095.0, "V", 5), st["c"], st["s"])
+            eng(st["c"] * d.vref / d.adc_max, "V", 5), st["c"], st["s"])
         v = self.hub.cal.counts_to_volts(d.board, self._ch, st["c"])
         if v is not None:
             txt += "\n" + T("Calibrado: %s") % eng(v, "V", 5)
@@ -174,8 +174,8 @@ class CalWin(CalBase):
         d = self.dev
         (c1, r1, _s1), (c2, r2, _s2) = self.pts
         try:
-            a, b = two_point(c1, r1, c2, r2)
-            rel = a / (d.vref / 4095.0)
+            a, b = two_point(c1, r1, c2, r2, d.adc_max)
+            rel = a / (d.vref / d.adc_max)
             if not 0.5 <= rel <= 2.0:
                 raise CalError(T("La ganancia sale %.2f veces la nominal: revisa los "
                                "valores de referencia.") % rel)
@@ -406,7 +406,7 @@ class CalOhm(PointCalWin):
 
     def _raw_r(self, c):
         d = self.dev
-        v = c * d.vref / 4095.0
+        v = c * d.vref / d.adc_max
         if v >= 0.985 * d.vref:
             return None
         return self.hub.cal.rref(d.board) * v / (d.vref - v)
@@ -416,7 +416,7 @@ class CalOhm(PointCalWin):
         r = self._raw_r(st["c"])
         txt = T("Sin calibrar: %s   (%.1f cuentas, σ %.2f)") % (
             eng(r, "Ω", 5) if r is not None else T("OL"), st["c"], st["s"])
-        rc = self.hub.cal.ohm_value(d.board, st["c"])
+        rc = self.hub.cal.ohm_value(d.board, st["c"], d.adc_max)
         if rc is not None:
             txt += "\n" + T("Calibrado: %s") % eng(rc, "Ω", 5)
         return txt
@@ -437,7 +437,7 @@ class CalOhm(PointCalWin):
 
     def compute(self):
         pts = [(p["c"], p["ref"]) for p in self.used_points()]
-        self.hub.cal.set_ohm_table(self.dev.board, pts)
+        self.hub.cal.set_ohm_table(self.dev.board, pts, self.dev.adc_max)
         return T("Tabla del óhmetro guardada con %d puntos.") % len(pts)
 
     def clear_cal(self):

@@ -2,24 +2,68 @@ import copy
 import os
 import time
 
-from PyQt5.QtCore import QPointF, QTimer, Qt
+from PyQt5.QtCore import QPointF, Qt, QTimer
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
-    QAction, QCheckBox, QDockWidget, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
+    QAction, QActionGroup, QCheckBox, QDockWidget, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
     QMessageBox, QPlainTextEdit, QPushButton, QStackedWidget, QTabWidget, QTextBrowser,
     QVBoxLayout, QWidget)
 
-from hub.lang import T
+import hub.lang as hlang
+from hub.lang import LANGS, T
 
-from camilab.documento import save_json
+from camilab import personalizados
 from camilab.bloques import SPECS
-from camilab.config import APP, EXT_VI, app_icon
-from camilab.documento import new_doc
-from camilab.editor.diagrama import Diagram
-from camilab.editor.paleta import Palette
-from camilab.menus import add_actions, add_examples, add_language, add_theme
+from camilab.config import APP, app_icon, EXT_VI, HERRAMIENTAS, lanzar, TH, THEME_NAMES
+from camilab.diagrama import Diagram, Palette
+from camilab.documento import new_doc, save_json
+from camilab.ejemplos import EXAMPLES
 from camilab.motor import EngineThread, RunCtx
-from camilab.panel.panel import Panel, PanelPalette
+from camilab.panel import Panel, PanelPalette
+
+
+def _radio(menu, items, actual, al_elegir):
+    grupo = QActionGroup(menu)
+    for clave, texto in items:
+        a = menu.addAction(texto)
+        a.setCheckable(True)
+        a.setChecked(clave == actual)
+        grupo.addAction(a)
+        a.triggered.connect(lambda _c=False, k=clave: al_elegir(k))
+
+
+def add_actions(menu, items):
+    for text, key, fn in items:
+        a = menu.addAction(text)
+        if key:
+            a.setShortcut(key)
+        a.triggered.connect(lambda _c=False, f=fn: f())
+
+
+def add_examples(menu, app):
+    sub = menu.addMenu(T("Ejemplos"))
+    for name, fn in EXAMPLES:
+        sub.addAction(T(name)).triggered.connect(
+            lambda _c=False, n=name, f=fn: app.open_example(n, f))
+
+
+def add_theme(menu, app):
+    sub = menu.addMenu(T("Tema"))
+    _radio(sub, [(k, T(nm)) for k, nm in THEME_NAMES], TH.get("name"), app.apply_theme)
+
+
+def add_language(menu, app, parent):
+    sub = menu.addMenu(T("Idioma"))
+    _radio(sub, LANGS, hlang.LANG, lambda k: app.set_lang(k, parent))
+
+
+def add_tools(menu, parent):
+    from camilab import personalizados
+    menu.addAction(T("Bloques personalizados")).triggered.connect(
+        lambda: personalizados.show(parent))
+    for texto, script, args in HERRAMIENTAS:
+        menu.addAction(T(texto)).triggered.connect(
+            lambda _c=False, s=script, a=args: lanzar(s, a, parent))
 
 
 class InstrumentWindow(QMainWindow):
@@ -150,6 +194,8 @@ class InstrumentWindow(QMainWindow):
         for d in (self.dock_pal, self.dock_help, self.dock_mon):
             m.addAction(d.toggleViewAction())
         m = mb.addMenu(T("Herramientas"))
+        m.addAction(T("Bloques personalizados")).triggered.connect(
+            lambda: personalizados.show(self))
         m.addAction(T("Asociar archivos .cami / .camp")).triggered.connect(
             lambda: self.app.associate(self))
         add_language(m, self.app, self)

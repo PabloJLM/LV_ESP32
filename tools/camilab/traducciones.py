@@ -152,9 +152,9 @@ EN.update({
     "Ejecutando": "Running",
     "Abortado.": "Aborted.",
     "Terminó sin errores.": "Finished without errors.",
-    "El ADC convierte de 0 a %.1f V en 0 a 4095 cuentas: cada cuenta vale %.2f mV. El DAC y el PWM son de 8 bits: 256 pasos de %.1f mV.":
-        "The ADC turns 0 to %.1f V into 0 to 4095 counts: each count is %.2f mV. DAC and PWM "
-        "are 8-bit: 256 steps of %.1f mV.",
+    "El ADC de %d bits convierte de 0 a %.1f V en 0 a %d cuentas: cada cuenta vale %.2f mV. El DAC y el PWM son de 8 bits: 256 pasos de %.1f mV.":
+        "The %d-bit ADC turns 0 to %.1f V into 0 to %d counts: each count is %.2f mV. DAC and "
+        "PWM are 8-bit: 256 steps of %.1f mV.",
     "Los bloques 'Abrir puerto' con puerto (proyecto) usan este.":
         "'Open port' blocks set to (proyecto) use this one.",
     "Nuevo": "New",
@@ -204,9 +204,10 @@ EN.update({
     "salida %d": "output %d",
     "... %d líneas omitidas ...": "... %d lines skipped ...",
     "(no existe)": "(missing)",
-    "Abre el puerto serie de la tarjeta. Cablea su salida 'sesión' a los bloques de E/S: ese cable marca el orden. SIM es la tarjeta simulada y (proyecto) usa el puerto del .camp.":
+    "Abre el puerto serie de la tarjeta. Cablea su salida 'sesión' a los bloques de E/S: ese cable marca el orden. SIM es la tarjeta simulada y (proyecto) usa el puerto del .camp. Si cableas 'puerto' (por ejemplo con un Selector de puerto), manda sobre la propiedad.":
         "Opens the board's serial port. Wire its 'session' output to the I/O blocks: that wire "
-        "sets the order. SIM is the simulated board and (project) uses the port of the .camp.",
+        "sets the order. SIM is the simulated board and (project) uses the port of the .camp. "
+        "If you wire 'port' (for example from a Port selector), it overrides the property.",
     "sesión": "session",
     "placa": "board",
     "Cierra el puerto. Ponlo al final, fuera del lazo.":
@@ -217,8 +218,9 @@ EN.update({
     "valor": "value",
     "Lee una entrada digital.":
         "Reads a digital input.",
-    "Lee una entrada analógica (0 a 4095 cuentas). voltaje = cuentas × Vref / 4095.":
-        "Reads an analog input (0 to 4095 counts). voltage = counts × Vref / 4095.",
+    "Lee una entrada analógica en cuentas de la resolución de la placa (10 bits: 0 a 1023, 12 bits: 0 a 4095). voltaje = cuentas × Vref / cuentas máx.":
+        "Reads an analog input in counts of the board resolution (10 bits: 0 to 1023, 12 bits: "
+        "0 to 4095). voltage = counts × Vref / max counts.",
     "cuentas": "counts",
     "voltaje": "voltage",
     "Saca un voltaje por el DAC (8 bits). Solo ESP32 Wrover y Nucleo tienen DAC.":
@@ -328,9 +330,9 @@ EN.update({
     "Repite N veces, 'i' va de 0 a N−1. Lo que sale del lazo se junta en un arreglo.":
         "Repeats N times, 'i' goes from 0 to N−1. What leaves the loop is collected into an "
         "array.",
-    "Ejecuta uno de sus dos casos según '?'. Con clic derecho → 'Agregar salida' sacas valores: cabléala en los dos casos.":
-        "Runs one of its two cases depending on '?'. Right click → 'Add output' takes values "
-        "out: wire it in both cases.",
+    "Ejecuta un caso según '?'. Con un booleano usa Falso y Verdadero, con un número el caso de ese índice (fuera de rango usa el 0). Clic derecho para agregar casos y salidas.":
+        "Runs one case chosen by '?'. A boolean uses False and True, a number the case with "
+        "that index (out of range uses 0). Right click to add cases and outputs.",
     "Control numérico": "Numeric control",
     "Terminal de un control del panel frontal: entrega lo que el usuario pone ahí.":
         "Terminal of a front-panel control: gives whatever the user sets there.",
@@ -352,10 +354,7 @@ EN.update({
     "Texto libre": "Free text",
     "Leer voltaje (AI)": "Read voltage (AI)",
     "Prender un LED (DO)": "Turn on an LED (DO)",
-    "Alarma por umbral": "Threshold alarm",
-    "Termómetro LM35 (escala)": "LM35 thermometer (scaling)",
-    "Filtro con shift register": "Filter with a shift register",
-    "Barrido DAC → curva (For)": "DAC sweep → curve (For)",
+    "Barrido DAC a curva (For)": "DAC sweep to curve (For)",
     "Data logger CSV": "CSV data logger",
     "Manual / automático (Case)": "Manual / automatic (Case)",
     "Color en NeoPixel": "NeoPixel color",
@@ -363,7 +362,7 @@ EN.update({
     "Prender un LED": "Turn on an LED",
     "Termómetro LM35": "LM35 thermometer",
     "Filtro digital (shift register)": "Digital filter (shift register)",
-    "Barrido DAC → curva": "DAC sweep → curve",
+    "Barrido DAC a curva": "DAC sweep to curve",
     "Voltaje": "Voltage",
     "Canal AI": "AI channel",
     "Voltaje vs tiempo": "Voltage vs time",
@@ -383,11 +382,9 @@ EN.update({
     "Datos guardados": "Logged data",
     "Automático": "Automatic",
     "Salida DO0": "DO0 output",
-    "DO0 → resistencia de 330 Ω → LED → GND": "DO0 → 330 Ω resistor → LED → GND",
-    "AO0 (GPIO26) → AI0 (GPIO36)": "AO0 (GPIO26) → AI0 (GPIO36)",
+    "Conecta DO0 a una resistencia de 330 Ω, luego el LED y GND": "Connect DO0 to a 330 Ω resistor, then the LED and GND",
+    "Conecta AO0 (GPIO26) con AI0 (GPIO36)": "Connect AO0 (GPIO26) to AI0 (GPIO36)",
     "Tira NeoPixel en GPIO25 (ESP32) / D6 (UNO)": "NeoPixel strip on GPIO25 (ESP32) / D6 (UNO)",
-    "LM35: 10 mV/°C → °C = 100 × V  ·  Vs a 5 V, salida a AI0":
-        "LM35: 10 mV/°C → °C = 100 × V  ·  Vs to 5 V, output to AI0",
     "Señal de 0 V a Vref en el canal AI elegido":
         "Signal from 0 V to Vref on the chosen AI channel",
     "Señal en AI2  ·  DO0 se enciende cuando el voltaje pasa el umbral":
@@ -467,6 +464,41 @@ EN.update({
     "Enciende o apaga el servidor FTP y la tarjeta SD. Necesita el WiFi conectado, los datos del FTP guardados y una SD puesta.":
         "Turns the FTP server and the SD card on or off. It needs the WiFi connected, the FTP data saved and an SD card inserted.",
     "encender": "turn on",
+    "Arreglo numérico": "Numeric array",
+    "Arreglo booleano": "Boolean array",
+    "Arreglo de texto": "Text array",
+    "Pantalla de arreglo numérico": "Numeric array display",
+    "Pantalla de arreglo booleano": "Boolean array display",
+    "Pantalla de arreglo de texto": "Text array display",
+    "Representación": "Representation",
+    "Entero (I32)": "Integer (I32)",
+    "Quitar el último": "Remove the last one",
+    "Selector de puerto": "Port selector",
+    "Buscar": "Refresh",
+    "puerto": "port",
+    "Personalizados": "Custom",
+    "Bloques personalizados": "Custom blocks",
+    "Número (1 byte)": "Number (1 byte)",
+    "Confirmación (AA / XX)": "Acknowledge (AA / XX)",
+    "Digital (A0 / A1)": "Digital (A0 / A1)",
+    "Número (línea)": "Number (line)",
+    "Texto (línea)": "Text (line)",
+    "El comando debe estar entre 0x00 y 0xFF.": "The command must be between 0x00 and 0xFF.",
+    "Definición incompleta.": "Incomplete definition.",
+    "Entrada": "Input",
+    "Tipo": "Type",
+    "Comando": "Command",
+    "Respuesta": "Reply",
+    "Abrir carpeta": "Open folder",
+    "¿Eliminar este bloque?": "Delete this block?",
+    "Crear selector de color": "Create color picker",
+    "Agregar caso": "Add case",
+    "Quitar el último caso": "Remove last case",
+    "Imagen (booleano)": "Image (boolean)",
+    "Máquina de estados": "State machine",
+    "Tiempo por estado": "Time per state",
+    "LED del panel": "Panel LED",
+    "Cada estado dura el tiempo elegido. LED real en DO0, tira NeoPixel en su pin por defecto.": "Each state lasts the chosen time. Real LED on DO0, NeoPixel strip on its default pin.",
 })
 
 

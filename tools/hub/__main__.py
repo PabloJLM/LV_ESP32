@@ -6,7 +6,7 @@ if not __package__:
     sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 from hub.lang import LANGS, T
-from hub.ui import QApplication
+from hub.ui import QApplication, app_icon
 
 from hub.hub import Hub, TOOLS
 
@@ -23,6 +23,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("LV_ESP32 Instrument Hub")
     app.setStyle("Fusion")
+    app.setWindowIcon(app_icon("hub"))
     hub = Hub(a.port, a.sim, a.tool)
     hub.show()
     rc = app.exec_()

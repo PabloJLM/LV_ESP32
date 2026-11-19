@@ -1,6 +1,6 @@
 @echo off
 rem Lanzador comun. Uso:  _run.bat <hub|camilab|flasher.py|tester.py> [argumentos]
-rem Lo llaman Hub.bat, CamiLab.bat, Flasher.bat, Tester.bat y Probe.bat.
+rem Lo llaman Hub.bat, CamiLab.bat, Flasher.bat y Tester.bat.
 setlocal
 set "TOOLS=%~dp0..\tools\"
 set "REPO=%~dp0.."

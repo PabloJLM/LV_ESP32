@@ -9,7 +9,7 @@ from hub.lang import T
 
 from camilab.bloques import CTL_KINDS, IND_KINDS, PANEL_ONLY
 from camilab.config import APP
-from camilab.panel.widgets import Banner, FreeText, Grid, PItem, PMIME, pick_image
+from camilab.widgets import REPS, Banner, FreeText, Grid, pick_image, PItem, PMIME
 
 
 class Panel(QWidget):
@@ -130,7 +130,7 @@ class Panel(QWidget):
                 QMessageBox.information(self, APP, T("Esa casilla ya está ocupada."))
                 return
             iid = self.host.new_terminal(tid)
-            self.place(iid, cell, big=tid in ("ind_chart", "ind_graph"))
+            self.place(iid, cell, big=tid in ("ind_chart", "ind_graph") or "_arr_" in tid)
         self.rebuild()
         self.modified()
 
@@ -183,6 +183,15 @@ class Panel(QWidget):
             a = sub.addAction("%d × %d" % (cs, rs))
             a.setEnabled(self.fits(it["r"], it["c"], rs, cs, ignore=iid))
             sizes[a] = (rs, cs)
+        reps = {}
+        n = self.doc["nodes"].get(iid)
+        if n and n["type"] in ("ctl_num", "ind_num", "ctl_arr_num", "ind_arr_num"):
+            sub2 = m.addMenu(T("Representación"))
+            for k, name in REPS:
+                a = sub2.addAction(T(name))
+                a.setCheckable(True)
+                a.setChecked(n["params"].get("rep", "double") == k)
+                reps[a] = k
         a_g = None
         if iid in self.doc["nodes"]:
             a_g = m.addAction(T("Ver en el diagrama"))
@@ -191,6 +200,8 @@ class Panel(QWidget):
         a = m.exec_(pos)
         if a == a_p:
             self.props(iid)
+        elif a in reps:
+            self.host.diagram.set_rep(iid, reps[a])
         elif a in sizes:
             it["rs"], it["cs"] = sizes[a]
             self.update_item(iid)
@@ -309,7 +320,8 @@ class Panel(QWidget):
 class PanelPalette(QTreeWidget):
     def __init__(self):
         QTreeWidget.__init__(self)
-        self.setHeaderHidden(True)
+        from camilab.diagrama import style_tree
+        style_tree(self)
         self.setDragEnabled(True)
         groups = [(T("Controles"), [(k, l) for k, l, _o in CTL_KINDS]),
                   (T("Indicadores"), [(k, l) for k, l, _t in IND_KINDS]),
@@ -319,6 +331,7 @@ class PanelPalette(QTreeWidget):
             top.setFlags(Qt.ItemIsEnabled)
             f = top.font(0)
             f.setBold(True)
+            f.setPixelSize(15)
             top.setFont(0, f)
             self.addTopLevelItem(top)
             for k, l in items:

@@ -1,15 +1,266 @@
-from PyQt5.QtCore import QObject, QRectF, Qt, pyqtSignal
-from PyQt5.QtWidgets import QGraphicsItem, QMenu
+from PyQt5.QtCore import pyqtSignal, QMimeData, QObject, QRectF, QSize, Qt
+from PyQt5.QtGui import QDrag, QFont, QIcon, QPainter, QPainterPath, QPen, QPixmap
+from PyQt5.QtWidgets import (
+    QGraphicsItem, QGraphicsPathItem, QGraphicsScene, QGraphicsView, QLineEdit, QMenu,
+    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget)
 
 from hub.lang import T
+from hub.ui import svg_pixmap
 
-from camilab.bloques import SPECS
+from camilab.bloques import CATS, SPECS
+from camilab.config import TH
 from camilab.documento import (
     add_node, add_wire, compute_parents, is_desc, node_size, ports, remove_node)
-from camilab.editor.dialogos import PropDialog
-from camilab.editor.escena import Scene, View
-from camilab.editor.items import (
-    BaseItem, NodeItem, StructItem, WireItem, frame_name, node_port_pos)
+from camilab.items import (
+    BaseItem, frame_name, GLYPH, MIME, ncases, node_port_pos, NodeItem, PortItem, PropDialog,
+    StructItem, WireItem)
+from camilab.widgets import REPS
+
+
+REP_TYPES = ("ctl_num", "ind_num", "ctl_arr_num", "ind_arr_num", "const_num")
+
+
+class Scene(QGraphicsScene):
+    def __init__(self, ed):
+        QGraphicsScene.__init__(self)
+        self.ed = ed
+        self.drag = None
+        self.tmp = None
+        self.setBackgroundBrush(TH["canvas"])
+
+    def port_at(self, pos):
+        for it in self.items(pos):
+            if isinstance(it, PortItem) and it.isVisible():
+                return it
+        return None
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.LeftButton and not self.ed.locked:
+            p = self.port_at(e.scenePos())
+            if p is not None:
+                self.drag = p
+                self.tmp = QGraphicsPathItem()
+                self.tmp.setPen(QPen(TH["accent"], 1.5, Qt.DashLine))
+                self.tmp.setZValue(50)
+                self.addItem(self.tmp)
+                e.accept()
+                return
+        QGraphicsScene.mousePressEvent(self, e)
+
+    def mouseMoveEvent(self, e):
+        if self.drag is not None:
+            p1 = self.drag.scenePos()
+            p2 = e.scenePos()
+            path = QPainterPath(p1)
+            path.lineTo(p2)
+            self.tmp.setPath(path)
+            return
+        QGraphicsScene.mouseMoveEvent(self, e)
+
+    def mouseReleaseEvent(self, e):
+        if self.drag is not None:
+            a = self.drag
+            b = self.port_at(e.scenePos())
+            self.removeItem(self.tmp)
+            self.tmp = None
+            self.drag = None
+            if b is not None and b is not a:
+                self.ed.connect_ports(a, b)
+            return
+        QGraphicsScene.mouseReleaseEvent(self, e)
+
+    def dragEnterEvent(self, e):
+        if e.mimeData().hasFormat(MIME) and not self.ed.locked:
+            e.acceptProposedAction()
+
+    def dragMoveEvent(self, e):
+        if e.mimeData().hasFormat(MIME):
+            e.acceptProposedAction()
+
+    def dropEvent(self, e):
+        tid = bytes(e.mimeData().data(MIME)).decode()
+        self.ed.add_block(tid, e.scenePos())
+        e.acceptProposedAction()
+
+
+class View(QGraphicsView):
+    def __init__(self, scene, ed):
+        QGraphicsView.__init__(self, scene)
+        self.ed = ed
+        self.setRenderHint(QPainter.Antialiasing)
+        self.setDragMode(QGraphicsView.RubberBandDrag)
+        self.setAcceptDrops(True)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MiddleButton:
+            self.pan = e.pos()
+            self.viewport().setCursor(Qt.ClosedHandCursor)
+            e.accept()
+            return
+        QGraphicsView.mousePressEvent(self, e)
+
+    def mouseMoveEvent(self, e):
+        if getattr(self, "pan", None) is not None:
+            d = e.pos() - self.pan
+            self.pan = e.pos()
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - d.x())
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - d.y())
+            e.accept()
+            return
+        QGraphicsView.mouseMoveEvent(self, e)
+
+    def mouseReleaseEvent(self, e):
+        if e.button() == Qt.MiddleButton and getattr(self, "pan", None) is not None:
+            self.pan = None
+            self.viewport().unsetCursor()
+            e.accept()
+            return
+        QGraphicsView.mouseReleaseEvent(self, e)
+
+    def wheelEvent(self, e):
+        if e.modifiers() & Qt.ControlModifier:
+            f = 1.15 if e.angleDelta().y() > 0 else 1 / 1.15
+            self.scale(f, f)
+            return
+        QGraphicsView.wheelEvent(self, e)
+
+    def keyPressEvent(self, e):
+        if e.key() in (Qt.Key_Delete, Qt.Key_Backspace) and not self.ed.locked:
+            self.ed.delete_selected()
+            return
+        QGraphicsView.keyPressEvent(self, e)
+
+
+CAT_ICON = {"LV_ESP32": "cat_io", "Diagnóstico": "cat_diag", "WiFi y FTP": "cat_net",
+            "Numérico": "cat_num", "Comparación": "cat_cmp", "Booleano": "cat_bool",
+            "Arreglos": "cat_arr", "Tiempo": "cat_time", "Texto": "cat_str",
+            "Archivo": "cat_file", "Estructuras": "cat_struct", "Personalizados": "cat_custom"}
+ICON = 24
+
+
+def style_tree(t):
+    f = t.font()
+    f.setPixelSize(14)
+    t.setFont(f)
+    t.setIconSize(QSize(ICON, ICON))
+    t.setIndentation(14)
+    t.setHeaderHidden(True)
+    t.setStyleSheet("QTreeWidget::item { padding: 3px 2px; }")
+
+
+def badge(text, kind):
+    pm = QPixmap(ICON, ICON)
+    pm.fill(Qt.transparent)
+    if not text:
+        return QIcon(pm)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing)
+    io = kind == "io"
+    p.setBrush(TH["io_body"] if io else TH["func"])
+    p.setPen(TH["accent"] if io else TH["func_line"])
+    p.drawRoundedRect(QRectF(0.5, 0.5, ICON - 1, ICON - 1), 5, 5)
+    f = QFont()
+    f.setBold(True)
+    f.setPixelSize(12 if len(text) <= 2 else 8)
+    p.setFont(f)
+    p.setPen(TH["accent"] if io else TH["func_text"])
+    p.drawText(QRectF(0, 0, ICON, ICON), Qt.AlignCenter, text[:4])
+    p.end()
+    return QIcon(pm)
+
+
+class Tree(QTreeWidget):
+    def startDrag(self, actions):
+        it = self.currentItem()
+        tid = it.data(0, Qt.UserRole) if it else None
+        if not tid:
+            return
+        md = QMimeData()
+        md.setData(MIME, tid.encode())
+        d = QDrag(self)
+        d.setMimeData(md)
+        d.exec_(Qt.CopyAction)
+
+
+class Palette(QWidget):
+    add = pyqtSignal(str)
+    hover = pyqtSignal(str)
+
+    def __init__(self):
+        QWidget.__init__(self)
+        self.find = QLineEdit()
+        self.find.setPlaceholderText(T("Buscar"))
+        self.find.setClearButtonEnabled(True)
+        self.find.textChanged.connect(self.filter)
+        self.tree = Tree()
+        style_tree(self.tree)
+        self.tree.setDragEnabled(True)
+        self.tree.setMouseTracking(True)
+        self.tree.itemDoubleClicked.connect(self._dbl)
+        self.tree.itemClicked.connect(self._click)
+        self.tree.itemEntered.connect(self._hover)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        lay.addWidget(self.find)
+        lay.addWidget(self.tree, 1)
+        self.fill()
+
+    def fill(self):
+        self.tree.clear()
+        col = TH["text"].name()
+        for cat in CATS:
+            top = QTreeWidgetItem([T(cat)])
+            top.setFlags(Qt.ItemIsEnabled)
+            top.setIcon(0, QIcon(svg_pixmap(CAT_ICON.get(cat, "cat_custom"), ICON, col)))
+            f = top.font(0)
+            f.setBold(True)
+            f.setPixelSize(15)
+            top.setFont(0, f)
+            self.tree.addTopLevelItem(top)
+            for s in SPECS.values():
+                if s.cat == cat:
+                    it = QTreeWidgetItem([T(s.label)])
+                    it.setIcon(0, badge(GLYPH.get(s.tid) or s.sym or "", s.kind))
+                    it.setData(0, Qt.UserRole, s.tid)
+                    it.setToolTip(0, T(s.doc))
+                    top.addChild(it)
+        self.filter(self.find.text())
+
+    def filter(self, text):
+        q = text.strip().lower()
+        for i in range(self.tree.topLevelItemCount()):
+            top = self.tree.topLevelItem(i)
+            n = 0
+            for k in range(top.childCount()):
+                it = top.child(k)
+                hide = bool(q) and q not in it.text(0).lower()
+                it.setHidden(hide)
+                n += not hide
+            top.setHidden(n == 0)
+            top.setExpanded(bool(q))
+
+    def _click(self, it, _c):
+        if it.parent() is not None or self.find.text().strip():
+            return
+        opening = not it.isExpanded()
+        for i in range(self.tree.topLevelItemCount()):
+            self.tree.topLevelItem(i).setExpanded(False)
+        it.setExpanded(opening)
+        if opening:
+            self.tree.scrollToItem(it, QTreeWidget.PositionAtTop)
+
+    def _dbl(self, it, _c):
+        tid = it.data(0, Qt.UserRole)
+        if tid:
+            self.add.emit(tid)
+
+    def _hover(self, it, _c):
+        tid = it.data(0, Qt.UserRole)
+        if tid:
+            s = SPECS[tid]
+            self.hover.emit("%s - %s" % (T(s.label), T(s.doc)))
 
 
 class Diagram(QObject):
@@ -182,19 +433,48 @@ class Diagram(QObject):
         if not (ts == td or "any" in (ts, td)):
             self.status.emit(T("Tipos incompatibles: %s → %s") % (ts, td))
             return
-        frame = 0
-        dn = self.doc["nodes"][dst.nid]
-        if dn["type"] == "case" and dst.name.endswith("_i"):
-            frame = dn["params"].get("view", 1)
-        for wi in list(self.wire_items):
-            if wi.w["dst"] == [dst.nid, dst.name] and wi.w.get("frame", 0) == frame:
-                self.scene.removeItem(wi)
-                self.wire_items.remove(wi)
-        w = add_wire(self.doc, src.nid, src.name, dst.nid, dst.name, frame)
-        self.make_wire(w)
+        self.link(src.nid, src.name, dst.nid, dst.name)
         self.refresh_visibility()
         self.status.emit("")
         self.changed.emit()
+
+    def exit_case(self, a, b):
+        up = set()
+        cur = self.parent.get(b)
+        while cur is not None:
+            up.add(cur)
+            cur = self.parent.get(cur)
+        cur = self.parent.get(a)
+        while cur is not None and cur not in up:
+            if self.doc["nodes"][cur]["type"] == "case":
+                return cur
+            cur = self.parent.get(cur)
+        return None
+
+    def link(self, a, ap, b, bp):
+        c = self.exit_case(a, b)
+        if c is None:
+            dn = self.doc["nodes"][b]
+            f = dn["params"].get("view", 1) if dn["type"] == "case" and bp.endswith("_i") else 0
+            self.put_wire(a, ap, b, bp, f)
+            return
+        n = self.doc["nodes"][c]
+        k = next((w["src"][1] for w in self.doc["wires"]
+                  if w["dst"] == [b, bp] and w["src"][0] == c), None)
+        if k is None:
+            k = "o%d" % int(n["params"].get("outs", 0))
+            n["params"]["outs"] = int(n["params"].get("outs", 0)) + 1
+            self.items[c].make_ports()
+            self.moved(self.items[c])
+            self.link(c, k, b, bp)
+        self.put_wire(a, ap, c, k + "_i", n["params"].get("view", 1))
+
+    def put_wire(self, a, ap, b, bp, f):
+        for wi in list(self.wire_items):
+            if wi.w["dst"] == [b, bp] and wi.w.get("frame", 0) == f:
+                self.scene.removeItem(wi)
+                self.wire_items.remove(wi)
+        self.make_wire(add_wire(self.doc, a, ap, b, bp, f))
 
     def remove_wire(self, w):
         if w in self.doc["wires"]:
@@ -277,8 +557,11 @@ class Diagram(QObject):
             acts[m.addAction(T("Agregar salida"))] = ("outs", 1)
             if n["params"].get("outs", 0):
                 acts[m.addAction(T("Quitar salida"))] = ("outs", -1)
-            acts[m.addAction(T("Mostrar caso %s") % frame_name(
-                0 if n["params"].get("view", 1) else 1))] = ("flip",)
+            acts[m.addAction(T("Agregar caso"))] = ("cases", 1)
+            if ncases(n) > 2:
+                acts[m.addAction(T("Quitar el último caso"))] = ("cases", -1)
+            nxt = (n["params"].get("view", 1) + 1) % ncases(n)
+            acts[m.addAction(T("Mostrar caso %s") % frame_name(nxt, n))] = ("flip", nxt)
         if s.kind not in ("struct",):
             unw = [(nm, t, lbl) for nm, t, _d, lbl in s.ins if not self.is_wired(nid, nm)]
             if unw:
@@ -288,11 +571,20 @@ class Diagram(QObject):
                     if t in ("num", "bool", "str"):
                         acts[sub.addAction(T(lbl))] = ("const", nm, t)
                         acts[sub2.addAction(T(lbl))] = ("ctl", nm, t)
+            if n["type"] in ("neo_all", "neo_px"):
+                acts[m.addAction(T("Crear selector de color"))] = ("color",)
             if s.outs:
                 sub = m.addMenu(T("Crear indicador"))
                 for nm, t, lbl in s.outs:
                     if t != "ses":
                         acts[sub.addAction(T(lbl))] = ("ind", nm, t, T(lbl))
+        if n["type"] in REP_TYPES:
+            sub = m.addMenu(T("Representación"))
+            for k, name in REPS:
+                a = sub.addAction(T(name))
+                a.setCheckable(True)
+                a.setChecked(n["params"].get("rep", "double") == k)
+                acts[a] = ("rep", k)
         m.addSeparator()
         acts[m.addAction(T("Eliminar"))] = ("del",)
         a = m.exec_(pos)
@@ -313,12 +605,18 @@ class Diagram(QObject):
             it.make_ports()
             self.moved(it)
             self.changed.emit()
+        elif act[0] == "rep":
+            self.set_rep(nid, act[1])
+        elif act[0] == "cases":
+            self.set_cases(nid, ncases(n) + act[1])
         elif act[0] == "flip":
-            n["params"]["view"] = 0 if n["params"].get("view", 1) else 1
+            n["params"]["view"] = act[1]
             self.items[nid].update()
             self.refresh_visibility()
         elif act[0] == "del":
             self.remove_nodes([nid])
+        elif act[0] == "color":
+            self.create_color(nid)
         else:
             self.create_for(nid, act)
 
@@ -327,16 +625,20 @@ class Diagram(QObject):
         kind, port, t = act[0], act[1], act[2]
         pp = node_port_pos(n, port, "out" if kind == "ind" else "in")
         w, _h = node_size(n)
+        u8 = {"rep": "byte"} if n["type"] in ("neo_all", "neo_px") and t == "num" else {}
         if kind == "const":
             tid = {"num": "const_num", "bool": "const_bool", "str": "const_str"}[t]
-            new = add_node(self.doc, tid, n["x"] - 60, n["y"] + pp.y() - 11)
+            new = add_node(self.doc, tid, n["x"] - 60, n["y"] + pp.y() - 11, **u8)
             self.doc["nodes"][new]["frame"] = n.get("frame", 0)
             self.make_item(new)
             w_ = add_wire(self.doc, new, "v", nid, port)
         elif kind == "ctl":
             tid = {"num": "ctl_num", "bool": "ctl_bool", "str": "ctl_str"}[t]
+            if n["type"] == "open" and port == "port":
+                tid = "ctl_port"
             lbl = [l for nm, _t, _d, l in SPECS[n["type"]].ins if nm == port][0]
-            new = add_node(self.doc, tid, n["x"] - 80, n["y"] + pp.y() - 13, label=T(lbl))
+            new = add_node(self.doc, tid, n["x"] - 80, n["y"] + pp.y() - 13, label=T(lbl),
+                           **(dict(u8, max=255.0) if u8 else {}))
             self.doc["nodes"][new]["frame"] = n.get("frame", 0)
             self.make_item(new)
             self.panel_add.emit(new)
@@ -350,6 +652,44 @@ class Diagram(QObject):
             self.panel_add.emit(new)
             w_ = add_wire(self.doc, nid, port, new, "v")
         self.make_wire(w_)
+        self.after_move()
+
+    def set_rep(self, nid, k):
+        n = self.doc["nodes"][nid]
+        n["params"]["rep"] = k
+        it = self.items[nid]
+        it.prepareGeometryChange()
+        it.update()
+        self.moved(it)
+        if SPECS[n["type"]].kind in ("ctl", "ind"):
+            self.panel_update.emit(nid)
+        self.changed.emit()
+
+    def set_cases(self, nid, cnt):
+        n = self.doc["nodes"][nid]
+        cnt = max(2, cnt)
+        for f in range(cnt, ncases(n)):
+            kids = [k for k, p in self.parent.items() if p == nid and
+                    self.doc["nodes"][k].get("frame", 0) == f]
+            self.remove_nodes(kids)
+            for w in list(self.doc["wires"]):
+                if w["dst"][0] == nid and w.get("frame", 0) == f:
+                    self.remove_wire(w)
+        n["params"]["cases"] = cnt
+        n["params"]["view"] = min(n["params"].get("view", 1), cnt - 1)
+        self.items[nid].update()
+        self.refresh_visibility()
+        self.changed.emit()
+
+    def create_color(self, nid):
+        n = self.doc["nodes"][nid]
+        y = n["y"] + node_port_pos(n, "g", "in").y() - 30
+        new = add_node(self.doc, "ctl_color", n["x"] - 110, y, label=T("Color"))
+        self.doc["nodes"][new]["frame"] = n.get("frame", 0)
+        self.make_item(new)
+        self.panel_add.emit(new)
+        for k in ("r", "g", "b"):
+            self.put_wire(new, k, nid, k, 0)
         self.after_move()
 
     def set_locked(self, on):

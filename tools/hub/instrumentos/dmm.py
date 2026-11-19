@@ -182,7 +182,7 @@ class DMM(InstrumentWindow):
                 d = self.dev
                 tab = None
                 if d.connected and not d.simulated:
-                    tab = self.hub.cal.ohm_value(d.board, st["c"])
+                    tab = self.hub.cal.ohm_value(d.board, st["c"], d.adc_max)
                 if tab is not None:
                     val = tab - (self.null if m == "ohm" else 0)
                 else:

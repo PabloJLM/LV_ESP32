@@ -8,12 +8,12 @@ from PyQt5.QtWidgets import (
     QTextBrowser, QVBoxLayout, QWidget)
 
 import core
-from hub.dev import BOARD_NAMES, DEFAULT_VREF, PINS, VREF
+from hub.dev import ADC_BITS, BOARD_NAMES, DEFAULT_ADC_BITS, DEFAULT_VREF, PINS, VREF
 from hub.lang import T
 
 from camilab.documento import save_json
 from camilab.config import APP, EXT_PROJ, EXT_VI, app_icon
-from camilab.menus import add_actions
+from camilab.ventana_instrumento import add_actions
 from camilab.simulador import FakeSerial
 
 
@@ -42,6 +42,8 @@ class IdentThread(QThread):
 def board_html(d):
     b = d["board"]
     vref = VREF.get(b, DEFAULT_VREF)
+    bits = ADC_BITS.get(b, DEFAULT_ADC_BITS)
+    full = 2 ** bits - 1
     n = d["n"]
     pins = PINS.get(b, {})
     rows = []
@@ -58,9 +60,9 @@ def board_html(d):
     return ("<h3>%s</h3><p>%s %s · Vref <b>%.1f V</b></p>"
             "<p>%s</p><table cellspacing=4>%s</table>") % (
         T(BOARD_NAMES.get(b, b)), T("Firmware"), "%s %s" % (d["variant"], d["version"]), vref,
-        T("El ADC convierte de 0 a %.1f V en 0 a 4095 cuentas: cada cuenta vale %.2f mV. "
+        T("El ADC de %d bits convierte de 0 a %.1f V en 0 a %d cuentas: cada cuenta vale %.2f mV. "
           "El DAC y el PWM son de 8 bits: 256 pasos de %.1f mV.") % (
-            vref, vref / 4095 * 1000, vref / 255 * 1000),
+            bits, vref, full, vref / full * 1000, vref / 255 * 1000),
         "".join(rows))
 
 

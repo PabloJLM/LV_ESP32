@@ -279,8 +279,8 @@ EN = {
     "%.1f cuentas = %s": "%.1f counts = %s",
     "Calcular y guardar": "Calculate and save",
     "Borrar calibración del canal": "Clear channel calibration",
-    "Sin calibrar: se usa Vref / 4095 (nominal).":
-        "Not calibrated: Vref / 4095 (nominal) is used.",
+    "Sin calibrar: se usa Vref / cuentas máx. (nominal).":
+        "Not calibrated: Vref / max counts (nominal) is used.",
     "Calibrado el %s:  V = %.6g · cuentas %+.5g V   (ganancia %.4f respecto al nominal)":
         "Calibrated on %s:  V = %.6g · counts %+.5g V   (gain %.4f vs nominal)",
     "Sin calibrar: %s   (%.1f cuentas, σ %.2f)": "Uncalibrated: %s   (%.1f counts, σ %.2f)",

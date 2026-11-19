@@ -10,15 +10,15 @@ from hub.lang import LANGS, T
 from hub.ui import (
     QApplication, QFrame, QHBoxLayout, QIcon, QLabel, QPushButton, QSS, QSize, QTimer,
     QToolButton, QVBoxLayout, QWidget, Qt, Runner, combo, fill_ports, group, make_icon,
-    padded, set_status)
+    app_icon, padded, set_status)
 
 from hub.instrumentos.bode import Bode
 from hub.instrumentos.digital import DigIn, DigOut
 from hub.instrumentos.dmm import DMM
 from hub.instrumentos.fgen import FGen
 from hub.instrumentos.scope import Scope
-from hub.instrumentos.pwm import PWM
-from hub.instrumentos.vps import VPS
+from hub.instrumentos.salidas import PWM
+from hub.instrumentos.salidas import VPS
 
 
 TOOLS = [
@@ -59,7 +59,7 @@ class Hub(QWidget):
         self.setObjectName("panel")
         self.setStyleSheet(HUB_QSS)
         self.setWindowTitle("LV_ESP32 Instrument Launcher")
-        self.setWindowIcon(QIcon(make_icon("scope", 64)))
+        self.setWindowIcon(app_icon("hub"))
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 8, 0, 8)

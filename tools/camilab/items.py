@@ -1,22 +1,52 @@
 from PyQt5.QtCore import QPointF, QRectF, Qt
 from PyQt5.QtGui import (
     QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPainterPathStroker, QPen, QPolygonF)
-from PyQt5.QtWidgets import QGraphicsItem, QGraphicsObject, QGraphicsPathItem, QMenu
+from PyQt5.QtWidgets import (
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout, QGraphicsItem,
+    QGraphicsObject, QGraphicsPathItem, QHBoxLayout, QLabel, QLineEdit, QMenu, QPushButton,
+    QSpinBox)
 
 from hub.lang import T
 
 from camilab.bloques import SPECS
+from camilab.config import fill_ports, port_value, tcol, TH
 from camilab.documento import const_text, node_size, ports
-from camilab.tema import TH, tcol
+from camilab.widgets import REPS, pick_image
 
 
 MIME = "application/x-camiblock"
 TYPE_COL = {"num": QColor("#e07000"), "bool": QColor("#00862b"), "str": QColor("#d0189c"),
             "arr": QColor("#e07000"), "ses": QColor("#6a2fa0"), "any": QColor("#707070")}
 TYPE_TAG = {"num": "DBL", "bool": "TF", "str": "abc", "arr": "[DBL]", "any": "VAR"}
+REP_TAG = {"double": "DBL", "int": "I32", "byte": "U8"}
+INT_COL = QColor("#1a50c8")
+GLYPH = {"open": "OPEN", "close": "CLOSE", "do_write": "DO", "di_read": "DI",
+         "ai_read": "AI", "ao_write": "AO", "gen_dac": "DAC", "gen_stop": "DAC off",
+         "pwm_write": "PWM", "servo_write": "SRV", "neo_all": "LED", "neo_px": "LED1",
+         "neo_pin": "LED#", "lcd_write": "LCD", "gen_state": "DAC?", "ping": "PING",
+         "ident": "ID", "wifi_save": "WiFi", "wifi_connect": "WiFi+", "wifi_disc": "WiFi off",
+         "wifi_status": "WiFi?", "ftp_save": "FTP", "ftp_set": "FTP+"}
 
 
-def frame_name(f):
+def term_look(n, t):
+    """Etiqueta y color de la terminal de un control o indicador, según tipo y representación."""
+    k = n["type"]
+    arr = "_arr_" in k or t == "arr"
+    elem = k.rsplit("_", 1)[1] if "_arr_" in k else ("num" if t == "arr" else t)
+    tag, col = TYPE_TAG[elem], TYPE_COL[elem]
+    rep = n["params"].get("rep", "double")
+    if elem == "num" and rep in REP_TAG and rep != "double":
+        tag, col = REP_TAG[rep], INT_COL
+    return ("[%s]" % tag if arr else tag), col
+
+
+def ncases(n):
+    return max(2, int(n["params"].get("cases", 2)))
+
+
+def frame_name(f, n=None):
+    if n is not None and ncases(n) > 2:
+        return str(f)
     return T("Verdadero") if f else T("Falso")
 
 
@@ -95,7 +125,7 @@ class PortItem(QGraphicsItem):
         else:
             p.setBrush(col if self.hot else TH["input"])
             p.setPen(QPen(col, 1.4))
-            p.drawEllipse(QRectF(-4, -4, 8, 8))
+            p.drawEllipse(QRectF(-5, -5, 10, 10))
         if self.hot:
             p.setBrush(Qt.NoBrush)
             p.setPen(QPen(TH["accent"], 1.5))
@@ -120,10 +150,6 @@ def node_port_pos(node, name, d="in"):
         return struct_port_pos(node, name)
     ins = [p[0] for p in s.ins]
     outs = [p[0] for p in s.outs]
-    if s.kind == "io":
-        if d == "in":
-            return QPointF(0, 30 + 16 * ins.index(name))
-        return QPointF(w, 30 + 16 * outs.index(name))
     if d == "in":
         return QPointF(0, h * (ins.index(name) + 1) / (len(ins) + 1))
     return QPointF(w, h * (outs.index(name) + 1) / (len(outs) + 1))
@@ -207,10 +233,12 @@ class NodeItem(BaseItem):
     def boundingRect(self):
         w, h = node_size(self.node)
         if self.kind in ("ctl", "ind"):
-            lw = QFontMetrics(QFont()).width(self.node["params"].get("label", "")) + 6
+            lw = QFontMetrics(QFont()).width(self.node["params"].get("label", "")) * 1.3 + 8
             ww = max(w, lw)
-            return QRectF((w - ww) / 2 - 2, -3, ww + 4, h + 22)
-        return QRectF(-3, -3, w + 6, h + 6)
+            return QRectF((w - ww) / 2 - 2, -3, ww + 4, h + 26)
+        if self.kind == "io":
+            return QRectF(-6, -3, w + 12, h + 26)
+        return QRectF(-6, -3, w + 12, h + 6)
 
     def paint(self, p, _o, _w):
         p.setRenderHint(QPainter.Antialiasing)
@@ -222,49 +250,48 @@ class NodeItem(BaseItem):
         f = QFont()
         if self.kind == "io":
             p.setBrush(TH["io_body"])
-            p.setPen(QPen(TH["accent"], 1.5))
-            p.drawRect(R)
-            p.fillRect(QRectF(0, 0, w, 18), TH["accent"])
-            f.setPixelSize(11)
+            p.setPen(QPen(TH["accent"], 2))
+            p.drawRoundedRect(R, 8, 8)
+            p.setBrush(TH["accent"])
+            p.setPen(Qt.NoPen)
+            p.drawRoundedRect(QRectF(0, 0, 7, h), 3, 3)
+            g = GLYPH.get(n["type"]) or s.sym or "?"
+            f.setPixelSize(20 if len(g) <= 2 else 14)
             f.setBold(True)
             p.setFont(f)
-            p.setPen(QColor("#ffffff"))
-            p.drawText(QRectF(4, 0, w - 8, 18), Qt.AlignVCenter | Qt.AlignLeft,
-                       "LV  " + T(s.label))
+            p.setPen(tcol(TH["accent"]))
+            p.drawText(QRectF(8, 0, w - 8, h), Qt.AlignCenter, g)
+            f.setPixelSize(12)
             f.setBold(False)
-            f.setPixelSize(10)
             p.setFont(f)
             p.setPen(TH["text"])
-            for k, (nm, t, _d, lbl) in enumerate(s.ins):
-                p.drawText(QRectF(8, 22 + 16 * k, w / 2, 16), Qt.AlignVCenter | Qt.AlignLeft,
-                           T(lbl))
-            for k, (nm, t, lbl) in enumerate(s.outs):
-                p.drawText(QRectF(w / 2 - 8, 22 + 16 * k, w / 2, 16),
-                           Qt.AlignVCenter | Qt.AlignRight, T(lbl))
+            lab = T(s.label)
             if n["type"] == "open":
-                p.setPen(TH["text2"])
-                p.drawText(QRectF(8, h - 18, w - 16, 16), Qt.AlignVCenter | Qt.AlignLeft,
-                           n["params"].get("port", "SIM"))
+                lab = n["params"].get("port", "SIM")
+            p.drawText(QRectF(-30, h + 2, w + 60, 16), Qt.AlignHCenter | Qt.AlignTop, lab)
         elif self.kind == "const":
             t = s.outs[0][1]
             p.setBrush(TH["input"])
-            p.setPen(QPen(TYPE_COL[t], 1.5))
-            p.drawRect(R)
-            f.setPixelSize(11)
-            p.setFont(f)
-            p.setPen(tcol(TYPE_COL[t]))
-            p.drawText(R, Qt.AlignCenter, const_text(n))
-        elif self.kind in ("ctl", "ind"):
-            t = (s.outs or s.ins)[0][1]
-            col = TYPE_COL[t]
-            p.setBrush(TH["input"])
-            p.setPen(QPen(col, 3.0 if self.kind == "ctl" else 1.4))
-            p.drawRect(R.adjusted(1, 1, -1, -1))
-            f.setPixelSize(10)
+            p.setPen(QPen(TYPE_COL[t], 2))
+            col = INT_COL if n["params"].get("rep") in ("int", "byte") and t == "num" \
+                else TYPE_COL[t]
+            p.setPen(QPen(col, 2))
+            p.drawRoundedRect(R, 5, 5)
+            f.setPixelSize(15)
             f.setBold(True)
             p.setFont(f)
             p.setPen(tcol(col))
-            p.drawText(QRectF(0, 0, w - 8, h), Qt.AlignCenter, TYPE_TAG[t])
+            p.drawText(R, Qt.AlignCenter, const_text(n))
+        elif self.kind in ("ctl", "ind"):
+            tag, col = term_look(n, (s.outs or s.ins)[0][1])
+            p.setBrush(TH["input"])
+            p.setPen(QPen(col, 3.0 if self.kind == "ctl" else 1.4))
+            p.drawRect(R.adjusted(1, 1, -1, -1))
+            f.setPixelSize(13)
+            f.setBold(True)
+            p.setFont(f)
+            p.setPen(tcol(col))
+            p.drawText(QRectF(0, 0, w - 8, h), Qt.AlignCenter, tag)
             p.setBrush(col)
             p.setPen(Qt.NoPen)
             if self.kind == "ctl":
@@ -273,16 +300,16 @@ class NodeItem(BaseItem):
                 tri = [QPointF(3, h / 2 - 4), QPointF(9, h / 2), QPointF(3, h / 2 + 4)]
             p.drawPolygon(QPolygonF(tri))
             f.setBold(False)
-            f.setPixelSize(11)
+            f.setPixelSize(13)
             p.setFont(f)
             p.setPen(TH["text"])
-            p.drawText(QRectF(-60, h + 1, w + 120, 16), Qt.AlignHCenter | Qt.AlignTop,
+            p.drawText(QRectF(-60, h + 2, w + 120, 18), Qt.AlignHCenter | Qt.AlignTop,
                        n["params"].get("label", ""))
         else:
             p.setBrush(TH["func"])
             p.setPen(QPen(TH["func_line"], 1.4))
-            p.drawRect(R)
-            f.setPixelSize(13 if len(s.sym or "") <= 2 else 10)
+            p.drawRoundedRect(R, 6, 6)
+            f.setPixelSize(18 if len(s.sym or "") <= 2 else 13)
             f.setBold(True)
             p.setFont(f)
             p.setPen(TH["func_text"])
@@ -354,8 +381,12 @@ class StructItem(BaseItem):
             f.setPixelSize(12)
             f.setBold(True)
             p.setFont(f)
-            p.setPen(tcol(TYPE_COL["bool"]) if n["params"].get("view", 1) else TH["alert"])
-            p.drawText(r, Qt.AlignCenter, "◀  %s  ▶" % frame_name(n["params"].get("view", 1)))
+            v = n["params"].get("view", 1)
+            if ncases(n) > 2:
+                p.setPen(tcol(TYPE_COL["num"]))
+            else:
+                p.setPen(tcol(TYPE_COL["bool"]) if v else TH["alert"])
+            p.drawText(r, Qt.AlignCenter, "◀  %s  ▶" % frame_name(v, n))
         p.setPen(QPen(QColor("#ffffff"), 1.2))
         for k in range(3):
             d = 4 + 4 * k
@@ -370,7 +401,8 @@ class StructItem(BaseItem):
         w, h = n["w"], n["h"]
         pos = e.pos()
         if n["type"] == "case" and self.hdr().contains(pos) and not self.ed.locked:
-            n["params"]["view"] = 0 if n["params"].get("view", 1) else 1
+            step = -1 if pos.x() < self.hdr().center().x() else 1
+            n["params"]["view"] = (n["params"].get("view", 1) + step) % ncases(n)
             self.update()
             self.ed.refresh_visibility()
             self.ed.changed.emit()
@@ -461,3 +493,140 @@ class WireItem(QGraphicsPathItem):
         a = m.addAction(T("Eliminar cable"))
         if m.exec_(e.screenPos()) == a:
             self.ed.remove_wire(self.w)
+
+
+class PropDialog(QDialog):
+    def __init__(self, ed, nid, parent=None):
+        QDialog.__init__(self, parent)
+        self.ed = ed
+        self.nid = nid
+        n = ed.doc["nodes"][nid]
+        s = SPECS[n["type"]]
+        self.setWindowTitle(T("Propiedades") + " - " + T(s.label))
+        f = QFormLayout(self)
+        self.get = {}
+        p = n["params"]
+        if s.kind in ("ctl", "ind"):
+            panel_fields(self, f, n)
+        for name, kind, default, label in s.params:
+            v = p.get(name, default)
+            if kind == "num":
+                self.num(f, name, T(label), v)
+            elif kind == "bool":
+                c = QCheckBox()
+                c.setChecked(bool(v))
+                f.addRow(T(label), c)
+                self.get[name] = c.isChecked
+            elif kind == "rep":
+                c = QComboBox()
+                for k, name in REPS:
+                    c.addItem(T(name), k)
+                c.setCurrentIndex(max(0, c.findData(v)))
+                f.addRow(T(label), c)
+                self.get[name] = c.currentData
+            elif kind == "port":
+                c = QComboBox()
+                c.setEditable(True)
+                fill_ports(c, v)
+                f.addRow(T(label), c)
+                self.get[name] = lambda c=c: port_value(c)
+            else:
+                e = QLineEdit(str(v))
+                f.addRow(T(label), e)
+                self.get[name] = e.text
+        if s.kind == "struct":
+            if n["type"] in ("while", "for"):
+                sp = QSpinBox()
+                sp.setRange(0, 4)
+                sp.setValue(int(p.get("sr", 0)))
+                f.addRow(T("Shift registers"), sp)
+                self.get["sr"] = sp.value
+            else:
+                sp = QSpinBox()
+                sp.setRange(0, 6)
+                sp.setValue(int(p.get("outs", 0)))
+                f.addRow(T("Terminales de salida"), sp)
+                self.get["outs"] = sp.value
+        for name, typ, default, label in s.ins:
+            if ed.is_wired(nid, name) or typ not in ("num", "bool", "str") or default is None:
+                continue
+            v = p.get("def_" + name, default)
+            if typ == "num":
+                self.num(f, "def_" + name, T("Si no se cablea: ") + T(label), v)
+            elif typ == "bool":
+                c = QCheckBox()
+                c.setChecked(bool(v))
+                f.addRow(T("Si no se cablea: ") + T(label), c)
+                self.get["def_" + name] = c.isChecked
+            else:
+                e = QLineEdit(str(v))
+                f.addRow(T("Si no se cablea: ") + T(label), e)
+                self.get["def_" + name] = e.text
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        f.addRow(bb)
+
+    def num(self, f, key, label, v, dec=4):
+        sp = QDoubleSpinBox()
+        sp.setRange(-1e9, 1e9)
+        sp.setDecimals(dec)
+        sp.setValue(float(v))
+        f.addRow(label, sp)
+        self.get[key] = sp.value
+
+    def values(self):
+        return {k: g() for k, g in self.get.items()}
+
+
+def panel_fields(dlg, f, n):
+    p = n["params"]
+    t = n["type"]
+    e = QLineEdit(p.get("label", ""))
+    f.addRow(T("Etiqueta"), e)
+    dlg.get["label"] = e.text
+    if t == "ind_img":
+        st = QLabel(T("con imagen") if p.get("image") else T("sin imagen"))
+        bt = QPushButton(T("Elegir..."))
+        box = QHBoxLayout()
+        box.addWidget(st, 1)
+        box.addWidget(bt)
+        f.addRow(T("Imagen"), box)
+        dlg.get["image"] = lambda: p.get("image")
+
+        def choose():
+            d = pick_image(dlg)
+            if d:
+                p["image"] = d
+                st.setText(T("con imagen"))
+        bt.clicked.connect(choose)
+    if t not in ("ctl_bool", "ctl_stop", "ind_led", "ind_img", "ctl_color", "ctl_ring", "ctl_str",
+                 "ind_str", "ind_graph", "ctl_port") and "_arr_" not in t:
+        u = QLineEdit(p.get("units", ""))
+        f.addRow(T("Unidades"), u)
+        dlg.get["units"] = u.text
+    if t in ("ctl_num", "ind_num", "ctl_arr_num", "ind_arr_num"):
+        c = QComboBox()
+        for k, name in REPS:
+            c.addItem(T(name), k)
+        c.setCurrentIndex(max(0, c.findData(p.get("rep", "double"))))
+        f.addRow(T("Representación"), c)
+        dlg.get["rep"] = c.currentData
+    if t in ("ctl_num", "ctl_knob", "ctl_slider", "ind_gauge", "ind_bar"):
+        dlg.num(f, "min", T("Mínimo"), p.get("min", 0.0))
+        dlg.num(f, "max", T("Máximo"), p.get("max", 10.0))
+    if t in ("ctl_num", "ctl_knob", "ctl_slider"):
+        dlg.num(f, "value", T("Valor inicial"), p.get("value", 0.0))
+    if t == "ctl_ring":
+        e2 = QLineEdit(p.get("options", ""))
+        f.addRow(T("Opciones (separadas por ;)"), e2)
+        dlg.get["options"] = e2.text
+    if t in ("ctl_bool",):
+        c = QCheckBox()
+        c.setChecked(bool(p.get("value", False)))
+        f.addRow(T("Valor inicial"), c)
+        dlg.get["value"] = c.isChecked
+    if t == "ind_chart":
+        dlg.num(f, "hist", T("Puntos visibles"), p.get("hist", 200), 0)
+    if t in ("ind_num", "ind_gauge", "ind_bar"):
+        dlg.num(f, "dec", T("Decimales"), p.get("dec", 3), 0)

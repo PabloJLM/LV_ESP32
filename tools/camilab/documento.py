@@ -4,6 +4,7 @@ import os
 from hub.lang import T
 
 from camilab.bloques import SPECS
+from camilab.config import PROJ
 
 
 def struct_ports(node):
@@ -44,6 +45,8 @@ def const_text(node):
         return "T" if v else "F"
     if t == "const_str":
         return '"%s"' % v
+    if node["params"].get("rep") in ("int", "byte"):
+        return "%d" % round(float(v))
     return "%g" % float(v)
 
 
@@ -53,12 +56,12 @@ def node_size(node):
         return node.get("w", 300), node.get("h", 200)
     nin, nout = len(s.ins), len(s.outs)
     if s.kind == "io":
-        return 150, 24 + 16 * max(nin, nout, 1) + 6
+        return 60, max(44, 18 * max(nin, nout) + 10)
     if s.kind == "const":
-        return max(38, 8 * len(const_text(node)) + 14), 22
+        return max(34, 9 * len(const_text(node)) + 14), 24
     if s.kind in ("ctl", "ind"):
-        return 46, max(26, 14 * max(nin, nout) + 6)
-    return max(36, 9 * len(s.sym or "") + 14), max(30, 14 * max(nin, nout) + 6)
+        return 52, max(30, 16 * max(nin, nout) + 6)
+    return max(38, 11 * len(s.sym or "") + 14), max(32, 16 * max(nin, nout) + 8)
 
 
 def new_panel():
@@ -86,6 +89,10 @@ def add_node(doc, tid, x, y, **params):
             p.setdefault("max", 10.0)
         if tid in ("ctl_num", "ctl_knob", "ctl_slider"):
             p.setdefault("value", 0.0)
+        if tid in ("ctl_num", "ind_num", "ctl_arr_num", "ind_arr_num"):
+            p.setdefault("rep", "double")
+        if tid.startswith("ctl_arr"):
+            p.setdefault("value", [])
         if tid == "ctl_ring":
             p.setdefault("options", T("Opción A") + ";" + T("Opción B") + ";" + T("Opción C"))
             p.setdefault("value", 0.0)
@@ -95,12 +102,15 @@ def add_node(doc, tid, x, y, **params):
             p.setdefault("value", False)
         if tid == "ctl_str":
             p.setdefault("value", "")
+        if tid == "ctl_port":
+            p.setdefault("value", PROJ)
         if tid == "ind_chart":
             p.setdefault("hist", 200)
     if tid in ("while", "for"):
         p.setdefault("sr", 0)
     if tid == "case":
         p.setdefault("outs", 0)
+        p.setdefault("cases", 2)
         p.setdefault("view", 1)
     p.update(params)
     n = {"id": nid, "type": tid, "x": float(x), "y": float(y), "params": p, "frame": 0}

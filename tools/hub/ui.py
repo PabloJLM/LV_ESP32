@@ -1,10 +1,12 @@
 import math
+import os
 import time
 import traceback
 
-from PyQt5.QtCore import Qt, QThread, QRectF, QPointF, QSize, QTimer, pyqtSignal as Signal
+from PyQt5.QtCore import QByteArray, Qt, QThread, QRectF, QPointF, QSize, QTimer, pyqtSignal as Signal
 from PyQt5.QtGui import (QColor, QFont, QPainter, QPen, QPixmap, QPolygonF, QRadialGradient,
                          QBrush, QIcon, QTextCursor)
+from PyQt5.QtSvg import QSvgRenderer
 from PyQt5.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QComboBox, QDial,
                              QDoubleSpinBox, QFileDialog, QFrame, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit,
@@ -14,6 +16,13 @@ from PyQt5.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QComboBox, Q
 import core
 from hub.dev import DeviceError
 from hub.lang import T
+
+SVG_DIR = os.path.join(core.REPO, "Images", "iconos")
+ICON_DIR = os.path.join(core.REPO, "iconos")
+
+
+def app_icon(name):
+    return QIcon(os.path.join(ICON_DIR, name + ".png"))
 
 C_CH = [QColor("#00ff40"), QColor("#c8ff28"), QColor("#40c8ff"), QColor("#ff7ad9")]
 C_MARK = QColor("#ff9a2e")
@@ -680,85 +689,20 @@ class InstrumentWindow(QWidget):
             self.set_status(T("No se pudo guardar: %s") % e, "err")
 
 
-def make_icon(kind, size=64):
+def svg_pixmap(name, size=64, color="#2a2a2a"):
     pm = QPixmap(size, size)
     pm.fill(Qt.transparent)
+    try:
+        with open(os.path.join(SVG_DIR, name + ".svg"), encoding="utf-8") as f:
+            data = f.read().replace("currentColor", color)
+    except OSError:
+        return pm
     p = QPainter(pm)
     p.setRenderHint(QPainter.Antialiasing)
-    s = size / 64.0
-    W = QPen(QColor("#2a2a2a"), 2.6 * s)
-    W.setCapStyle(Qt.RoundCap)
-    p.setPen(W)
-    f = QFont()
-    f.setBold(True)
-
-    def wave(fn, x0=12, x1=52, yc=32, amp=11, n=60):
-        pts = [QPointF((x0 + (x1 - x0) * i / n) * s, (yc - amp * fn(i / float(n))) * s)
-               for i in range(n + 1)]
-        p.drawPolyline(QPolygonF(pts))
-
-    if kind == "dmm":
-        p.setBrush(Qt.NoBrush)
-        p.drawRoundedRect(QRectF(12 * s, 14 * s, 40 * s, 20 * s), 3 * s, 3 * s)
-        f.setPixelSize(int(14 * s))
-        p.setFont(f)
-        p.setPen(QColor("#2a2a2a"))
-        p.drawText(QRectF(12 * s, 14 * s, 40 * s, 20 * s), Qt.AlignCenter, "8.88")
-        p.setPen(W)
-        p.setBrush(Qt.NoBrush)
-        p.drawEllipse(QPointF(32 * s, 46 * s), 7 * s, 7 * s)
-    elif kind == "scope":
-        p.setBrush(Qt.NoBrush)
-        p.drawRect(QRectF(11 * s, 13 * s, 42 * s, 34 * s))
-        p.setPen(QPen(QColor("#0a8a1a"), 2.2 * s))
-        wave(lambda u: math.sin(u * 4 * math.pi), 13, 51, 30, 10)
-        p.setPen(W)
-        p.drawLine(QPointF(24 * s, 52 * s), QPointF(40 * s, 52 * s))
-    elif kind == "fgen":
-        wave(lambda u: math.sin(u * 2 * math.pi), 10, 34, 26, 9)
-        p.drawPolyline(QPolygonF([QPointF(36 * s, 35 * s), QPointF(36 * s, 17 * s),
-                                  QPointF(45 * s, 17 * s), QPointF(45 * s, 35 * s),
-                                  QPointF(54 * s, 35 * s)]))
-        p.drawLine(QPointF(14 * s, 47 * s), QPointF(50 * s, 47 * s))
-        p.drawLine(QPointF(44 * s, 42 * s), QPointF(50 * s, 47 * s))
-        p.drawLine(QPointF(44 * s, 52 * s), QPointF(50 * s, 47 * s))
-    elif kind == "vps":
-        p.drawRect(QRectF(16 * s, 20 * s, 32 * s, 28 * s))
-        p.drawLine(QPointF(24 * s, 14 * s), QPointF(24 * s, 20 * s))
-        p.drawLine(QPointF(40 * s, 14 * s), QPointF(40 * s, 20 * s))
-        f.setPixelSize(int(15 * s))
-        p.setFont(f)
-        p.drawText(QRectF(16 * s, 20 * s, 32 * s, 28 * s), Qt.AlignCenter, "+ −")
-    elif kind == "pwm":
-        for x0, w in ((10, 8), (28, 14), (46, 4)):
-            p.drawPolyline(QPolygonF([QPointF(x0 * s, 42 * s), QPointF(x0 * s, 22 * s),
-                                      QPointF((x0 + w) * s, 22 * s),
-                                      QPointF((x0 + w) * s, 42 * s)]))
-        p.drawLine(QPointF(8 * s, 42 * s), QPointF(56 * s, 42 * s))
-    elif kind == "bode":
-        p.drawLine(QPointF(12 * s, 12 * s), QPointF(12 * s, 52 * s))
-        p.drawLine(QPointF(12 * s, 52 * s), QPointF(54 * s, 52 * s))
-        p.drawPolyline(QPolygonF([QPointF(14 * s, 22 * s), QPointF(30 * s, 22 * s),
-                                  QPointF(36 * s, 26 * s), QPointF(52 * s, 46 * s)]))
-    elif kind in ("digin", "digout"):
-        for i, on in enumerate((1, 0, 1, 1)):
-            p.setBrush(QColor("#10c030") if on else QColor("#0a3a0a"))
-            p.setPen(QPen(QColor("#2a2a2a"), 1.4 * s))
-            p.drawEllipse(QPointF((17 + i * 10) * s, 22 * s), 4 * s, 4 * s)
-        p.setPen(W)
-        if kind == "digin":
-            p.drawLine(QPointF(32 * s, 50 * s), QPointF(32 * s, 34 * s))
-            p.drawLine(QPointF(26 * s, 40 * s), QPointF(32 * s, 34 * s))
-            p.drawLine(QPointF(38 * s, 40 * s), QPointF(32 * s, 34 * s))
-        else:
-            p.drawLine(QPointF(32 * s, 34 * s), QPointF(32 * s, 50 * s))
-            p.drawLine(QPointF(26 * s, 44 * s), QPointF(32 * s, 50 * s))
-            p.drawLine(QPointF(38 * s, 44 * s), QPointF(32 * s, 50 * s))
-    elif kind in ("cal", "calohm", "caldiv"):
-        p.setBrush(Qt.NoBrush)
-        p.drawArc(QRectF(12 * s, 18 * s, 40 * s, 40 * s), 20 * 16, 140 * 16)
-        p.drawLine(QPointF(32 * s, 38 * s), QPointF(42 * s, 24 * s))
-        p.setBrush(QColor("#2a2a2a"))
-        p.drawEllipse(QPointF(32 * s, 38 * s), 2.5 * s, 2.5 * s)
+    QSvgRenderer(QByteArray(data.encode())).render(p)
     p.end()
     return pm
+
+
+def make_icon(kind, size=64):
+    return svg_pixmap(kind, size)

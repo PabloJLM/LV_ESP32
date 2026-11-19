@@ -1,18 +1,18 @@
-import base64
 import math
 import os
 
-from PyQt5.QtCore import QBuffer, QByteArray, QIODevice, QMimeData, QPointF, QRectF, Qt
+from PyQt5.QtCore import pyqtSignal, QBuffer, QByteArray, QIODevice, QMimeData, QPointF, QRectF, Qt
 from PyQt5.QtGui import QColor, QDrag, QFont, QImage, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QColorDialog, QComboBox, QDial, QDoubleSpinBox, QFileDialog, QFrame, QHBoxLayout, QLabel,
-    QLineEdit, QMenu, QMessageBox, QPushButton, QSizePolicy, QSlider, QVBoxLayout, QWidget)
+    QLineEdit, QMenu, QMessageBox, QPushButton, QSizePolicy, QSlider, QTableWidget,
+    QTableWidgetItem, QVBoxLayout, QWidget)
 
 from hub.lang import T
 from hub.ui import Led, Plot
 
-from camilab.config import APP
-from camilab.tema import TH, style_plot
+import base64
+from camilab.config import APP, fill_ports, port_value, PROJ, style_plot, TH
 
 
 PMIME = "application/x-camipanel"
@@ -71,6 +71,96 @@ def fmt(v, dec=3):
     if isinstance(v, (list, tuple)):
         return "[%d]" % len(v)
     return str(v)
+
+
+REPS = (("double", "Double"), ("int", "Entero (I32)"), ("byte", "Byte (U8)"))
+LIMITS = {"int": (-2147483648, 2147483647), "byte": (0, 255)}
+
+
+def as_rep(v, rep):
+    """Pasa un número a la representación elegida. Entero y byte redondean y se limitan."""
+    v = float(v)
+    if rep not in LIMITS:
+        return v
+    lo, hi = LIMITS[rep]
+    return int(max(lo, min(hi, round(v))))
+
+
+def num_text(v, rep="double"):
+    return "%d" % v if rep in LIMITS else "%g" % v
+
+
+class ArrayBox(QWidget):
+    """Una columna con los elementos de un arreglo. Editable (control) o solo lectura."""
+    changed = pyqtSignal()
+
+    def __init__(self, typ, rep, editable):
+        QWidget.__init__(self)
+        self.typ, self.rep, self.editable = typ, rep, editable
+        v = QVBoxLayout(self)
+        v.setContentsMargins(0, 0, 0, 0)
+        self.tab = QTableWidget(0, 1)
+        self.tab.horizontalHeader().setVisible(False)
+        self.tab.horizontalHeader().setStretchLastSection(True)
+        self.tab.setMinimumHeight(70)
+        v.addWidget(self.tab, 1)
+        if editable:
+            h = QHBoxLayout()
+            for text, tip, fn in (("+", T("Agregar elemento"), self.add),
+                                  ("-", T("Quitar el último"), self.remove)):
+                b = QPushButton(text)
+                b.setToolTip(tip)
+                b.clicked.connect(fn)
+                h.addWidget(b)
+            v.addLayout(h)
+            self.tab.itemChanged.connect(lambda _i: self.changed.emit())
+        else:
+            self.tab.setEditTriggers(QTableWidget.NoEditTriggers)
+
+    def item(self, x):
+        if self.typ == "bool":
+            it = QTableWidgetItem("T" if x else "F")
+            if self.editable:
+                it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
+                it.setCheckState(Qt.Checked if x else Qt.Unchecked)
+                it.setText("")
+            return it
+        if self.typ == "num":
+            try:
+                return QTableWidgetItem(num_text(as_rep(x, self.rep), self.rep))
+            except (TypeError, ValueError):
+                return QTableWidgetItem(str(x))
+        return QTableWidgetItem(str(x))
+
+    def set_values(self, vals):
+        self.tab.blockSignals(True)
+        self.tab.setRowCount(len(vals))
+        for i, x in enumerate(vals):
+            self.tab.setItem(i, 0, self.item(x))
+        self.tab.blockSignals(False)
+
+    def values(self):
+        out = []
+        for i in range(self.tab.rowCount()):
+            it = self.tab.item(i, 0)
+            if self.typ == "bool":
+                out.append(it.checkState() == Qt.Checked)
+            elif self.typ == "num":
+                try:
+                    out.append(as_rep(it.text().replace(",", "."), self.rep))
+                except ValueError:
+                    out.append(0)
+            else:
+                out.append(it.text())
+        return out
+
+    def add(self):
+        self.set_values(self.values() + [{"num": 0, "bool": False, "str": ""}[self.typ]])
+        self.changed.emit()
+
+    def remove(self):
+        self.set_values(self.values()[:-1])
+        self.changed.emit()
 
 
 class ImageBox(QLabel):
@@ -234,11 +324,18 @@ class PItem(QFrame):
         self.w = None
         if k == "image":
             self.w = ImageBox(self.panel.doc["panel"]["items"][self.iid].get("data"))
+        elif k == "ind_img":
+            self.w = ImageBox(p.get("image"))
+            self.w.setVisible(False)
         elif k == "ctl_num":
+            rep = p.get("rep", "double")
+            lo, hi = float(p.get("min", 0)), float(p.get("max", 10))
+            if rep in LIMITS:
+                lo, hi = max(lo, LIMITS[rep][0]), min(hi, LIMITS[rep][1])
             self.w = QDoubleSpinBox()
-            self.w.setRange(float(p.get("min", 0)), float(p.get("max", 10)))
-            self.w.setDecimals(int(p.get("dec", 3)))
-            self.w.setSingleStep((float(p.get("max", 10)) - float(p.get("min", 0))) / 100.0)
+            self.w.setRange(lo, hi)
+            self.w.setDecimals(0 if rep in LIMITS else int(p.get("dec", 3)))
+            self.w.setSingleStep(1 if rep in LIMITS else (hi - lo) / 100.0)
             if p.get("units"):
                 self.w.setSuffix(" " + p["units"])
             self.w.setValue(float(p.get("value", 0)))
@@ -270,6 +367,20 @@ class PItem(QFrame):
         elif k == "ctl_str":
             self.w = QLineEdit(str(p.get("value", "")))
             self.w.textChanged.connect(self.changed)
+        elif k == "ctl_port":
+            box = QWidget()
+            hl = QHBoxLayout(box)
+            hl.setContentsMargins(0, 0, 0, 0)
+            self.cb = QComboBox()
+            self.cb.setEditable(True)
+            fill_ports(self.cb, p.get("value", PROJ))
+            b = QPushButton(T("Buscar"))
+            b.clicked.connect(lambda: (fill_ports(self.cb, port_value(self.cb)), self.changed()))
+            hl.addWidget(self.cb, 1)
+            hl.addWidget(b)
+            self.w = box
+            self.cb.currentIndexChanged.connect(self.changed)
+            self.cb.editTextChanged.connect(self.changed)
         elif k == "ctl_ring":
             self.w = QComboBox()
             for o in [x.strip() for x in str(p.get("options", "")).split(";") if x.strip()]:
@@ -308,6 +419,11 @@ class PItem(QFrame):
             hl.addWidget(self.led)
             hl.addStretch(1)
             self.w = box
+        elif "_arr_" in k:
+            self.w = ArrayBox(k.rsplit("_", 1)[1], p.get("rep", "double"), k.startswith("ctl"))
+            if k.startswith("ctl"):
+                self.w.set_values(p.get("value", []))
+                self.w.changed.connect(self.changed)
         elif k == "ind_gauge":
             self.w = Gauge(p)
         elif k == "ind_bar":
@@ -337,12 +453,16 @@ class PItem(QFrame):
         k = self.kind
         p = self.node["params"] if self.node else {}
         if k == "ctl_num":
-            return self.w.value()
+            return as_rep(self.w.value(), p.get("rep", "double"))
+        if k.startswith("ctl_arr"):
+            return self.w.values()
         if k in ("ctl_knob", "ctl_slider"):
             lo, hi = float(p.get("min", 0)), float(p.get("max", 10))
             return lo + (hi - lo) * self.dial.value() / 1000.0
         if k == "ctl_str":
             return self.w.text()
+        if k == "ctl_port":
+            return port_value(self.cb)
         if k == "ctl_ring":
             return float(max(0, self.w.currentIndex()))
         if k == "ctl_color":
@@ -389,6 +509,8 @@ class PItem(QFrame):
             self.w.setText("---")
         elif k == "ind_led":
             self.led.set(False)
+        elif k == "ind_img":
+            self.w.setVisible(False)
         elif k in ("ind_gauge", "ind_bar"):
             self.w.put(None)
         elif k in ("ind_chart", "ind_graph"):
@@ -397,6 +519,8 @@ class PItem(QFrame):
             self.w.set_traces([])
         elif k == "ind_str":
             self.w.setText("")
+        elif k.startswith("ind_arr"):
+            self.w.set_values([])
         elif k == "ctl_stop":
             self.btn.setChecked(False)
 
@@ -404,9 +528,16 @@ class PItem(QFrame):
         k = self.kind
         p = self.node["params"]
         if k == "ind_num":
-            self.w.setText(fmt(v, p.get("dec", 3)) + (" " + p["units"] if p.get("units") else ""))
+            rep, dec = p.get("rep", "double"), p.get("dec", 3)
+            if rep in LIMITS and isinstance(v, (int, float)) and not isinstance(v, bool):
+                v, dec = as_rep(v, rep), 0
+            self.w.setText(fmt(v, dec) + (" " + p["units"] if p.get("units") else ""))
+        elif k.startswith("ind_arr"):
+            self.w.set_values(list(v) if isinstance(v, (list, tuple)) else [v])
         elif k == "ind_led":
             self.led.set(bool(v) if not isinstance(v, (list, tuple)) else any(v))
+        elif k == "ind_img":
+            self.w.setVisible(bool(v) if not isinstance(v, (list, tuple)) else any(v))
         elif k in ("ind_gauge", "ind_bar"):
             self.w.put(v)
         elif k == "ind_str":

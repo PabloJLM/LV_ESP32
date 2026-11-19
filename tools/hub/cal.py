@@ -8,7 +8,7 @@ from hub.lang import T
 CFG = os.path.join(os.path.expanduser("~"), ".cal_mod.json")
 DEFAULT_RREF = 2200.0
 FULL_SCALE = 4095.0
-MIN_SPAN = 500
+MIN_SPAN = 500 / FULL_SCALE
 OHM_MIN_GAP = 0.05
 
 
@@ -16,16 +16,17 @@ class CalError(Exception):
     pass
 
 
-def two_point(c1, r1, c2, r2):
-    if abs(c2 - c1) < MIN_SPAN:
+def two_point(c1, r1, c2, r2, fs=FULL_SCALE):
+    span = MIN_SPAN * fs
+    if abs(c2 - c1) < span:
         raise CalError(T("Puntos muy juntos: sepáralos al menos %d cuentas (usa ~10 %% y ~90 "
-                         "%% del rango).") % MIN_SPAN)
+                         "%% del rango).") % span)
     a = (r2 - r1) / (c2 - c1)
     return a, r1 - a * c1
 
 
-def ohm_z(counts):
-    x = min(max(float(counts), 1.0), FULL_SCALE - 1.0) / FULL_SCALE
+def ohm_z(counts, fs=FULL_SCALE):
+    x = min(max(float(counts), 1.0), fs - 1.0) / fs
     return math.log(x / (1.0 - x))
 
 
@@ -103,12 +104,12 @@ class Calibration(object):
         t = self._get(board).get("ohm")
         return t if isinstance(t, dict) and t.get("pts") else None
 
-    def set_ohm_table(self, board, pts):
+    def set_ohm_table(self, board, pts, fs=FULL_SCALE):
         rows = []
         for c, r in pts:
             if not 1.0 <= r <= 10e6:
                 raise CalError(T("Resistencia fuera de rango (1 Ω a 10 MΩ)."))
-            rows.append((ohm_z(c), math.log(r), float(c), float(r)))
+            rows.append((ohm_z(c, fs), math.log(r), float(c), float(r)))
         if not rows:
             raise CalError(T("Captura al menos un punto."))
         rows.sort()
@@ -124,12 +125,12 @@ class Calibration(object):
     def clear_ohm(self, board):
         return self._get(board).pop("ohm", None) is not None
 
-    def ohm_value(self, board, counts):
+    def ohm_value(self, board, counts, fs=FULL_SCALE):
         t = self.ohm_table(board)
         if t is None:
             return None
-        pts = [(ohm_z(c), math.log(r)) for c, r in t["pts"]]
-        z = ohm_z(counts)
+        pts = [(ohm_z(c, fs), math.log(r)) for c, r in t["pts"]]
+        z = ohm_z(counts, fs)
         if z <= pts[0][0]:
             lr = pts[0][1] + (z - pts[0][0])
         elif z >= pts[-1][0]:

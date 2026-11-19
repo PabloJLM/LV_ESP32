@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Lanzador para Linux/macOS.  Uso:  scripts/lv.sh <hub|camilab|flasher|tester|probe> [argumentos]
+# Lanzador para Linux/macOS.  Uso:  scripts/lv.sh <hub|camilab|flasher|tester> [argumentos]
 # Crea y usa el entorno <repo>/.venv (PyQt5, pyserial, esptool) la primera vez.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(dirname "$HERE")"
@@ -13,8 +13,7 @@ case "$TOOL" in
     camilab) TARGET="$TOOLS/camilab" ;;
     flasher) TARGET="$TOOLS/flasher.py" ;;
     tester)  TARGET="$TOOLS/tester.py" ;;
-    probe)   TARGET="$TOOLS/flasher.py"; set -- --tool probe "$@" ;;
-    *) echo "Uso: scripts/lv.sh <hub|camilab|flasher|tester|probe> [argumentos]"; exit 2 ;;
+    *) echo "Uso: scripts/lv.sh <hub|camilab|flasher|tester> [argumentos]"; exit 2 ;;
 esac
 
 # Un venv sin pip (p. ej. creado sin python3-venv) queda roto: se descarta.

@@ -9,7 +9,7 @@ try:
     from hub.ui import (QSS, QApplication, QComboBox, QFileDialog, QHBoxLayout, QLabel,
                         QLineEdit, QPlainTextEdit, QProgressBar, QPushButton, QTextCursor,
                         QThread, QVBoxLayout, QWidget, Signal, fill_ports, group, hint,
-                        set_status)
+                        set_status, app_icon)
 except ImportError:
     sys.stderr.write("\nFalta la libreria grafica. Instalala en el Python portable:\n\n"
                      "    %s -m pip install PyQt5\n\n" % sys.executable)
@@ -244,24 +244,6 @@ class FlashWindow(ToolWindow):
         self.start(lambda line, step: core.flash_all(b, p, line, step, bin_file=f))
 
 
-class ProbeWindow(ToolWindow):
-    TITLE = "Probar tarjeta"
-    HINT = "Manda los comandos del protocolo a la tarjeta y revisa las respuestas."
-
-    def build(self):
-        self.row("Puerto", self.cb_port, self.btn_scan)
-        self.ch = [self.row(t, QLineEdit("0")) for t in ("Canal DO", "Canal AI", "Canal PWM")]
-        self.buttons.addStretch(1)
-        self.button("Probar", self.go, main=True)
-
-    def go(self):
-        p = self.port()
-        dio, adc, pwm = (int(e.text()) if e.text().strip().isdigit() else None
-                         for e in self.ch)
-        self.start(lambda line, step: core.run_probe(p, line, step, dio=dio, adc=adc,
-                                                     pwm=pwm))
-
-
 class OnlineWindow(ToolWindow):
     TITLE = "WiFi y FTP"
     HINT = ("Conecta el ESP32 (firmware '+ WiFi/FTP') a tu red y publica la SD por FTP. "
@@ -361,7 +343,7 @@ class Launcher(QWidget):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tool", choices=["flash", "probe", "online"], default=None)
+    ap.add_argument("--tool", choices=["flash", "online"], default=None)
     ap.add_argument("--board", default=None)
     ap.add_argument("--port", default=None)
     a = ap.parse_args()
@@ -369,10 +351,9 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("LV_ESP32")
     app.setStyle("Fusion")
+    app.setWindowIcon(app_icon("flasher"))
     if a.tool == "flash":
         w = FlashWindow(a.board, a.port)
-    elif a.tool == "probe":
-        w = ProbeWindow(a.port)
     elif a.tool == "online":
         w = OnlineWindow(a.port)
     else:

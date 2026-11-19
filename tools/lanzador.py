@@ -2,13 +2,13 @@ import os
 import subprocess
 import sys
 
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QPushButton, QVBoxLayout, QWidget
 
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 
 APPS = (
     ("Cargar firmware", ["flasher.py", "--tool", "flash"]),
-    ("Probar la tarjeta", ["flasher.py", "--tool", "probe"]),
     ("Hub", ["hub"]),
     ("CamiLab", ["camilab"]),
     ("Tester", ["tester.py"]),
@@ -20,6 +20,7 @@ def abrir(args):
 
 
 app = QApplication(sys.argv)
+app.setWindowIcon(QIcon(os.path.join(os.path.dirname(TOOLS), "iconos", "lanzador.png")))
 w = QWidget()
 w.setWindowTitle("LV_ESP32")
 v = QVBoxLayout(w)

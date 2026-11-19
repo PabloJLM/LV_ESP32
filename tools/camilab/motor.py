@@ -228,7 +228,12 @@ class Engine(object):
         sel = self.read(sid, "sel", False)
         if isinstance(sel, (list, tuple)):
             raise VIError(T("El selector del Case no puede ser un arreglo."), sid)
-        f = 1 if sel else 0
+        if isinstance(sel, bool) or int(n["params"].get("cases", 2)) <= 2 and sel in (0, 1):
+            f = 1 if sel else 0
+        else:
+            f = int(round(float(sel)))
+            if not 0 <= f < int(n["params"].get("cases", 2)):
+                f = 0
         self.scope(sid, f)
         for k in range(int(n["params"].get("outs", 0))):
             self.values[(sid, "o%d" % k)] = self.read(sid, "o%d_i" % k, 0.0, frame=f)

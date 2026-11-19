@@ -57,6 +57,8 @@ BOARD_NAMES = {
 
 VREF = {"UNO": 5.0, "NANO": 5.0}
 DEFAULT_VREF = 3.3
+ADC_BITS = {"UNO": 10, "NANO": 10}
+DEFAULT_ADC_BITS = 12
 
 GEN_SHAPES = {"sine": 0, "tri": 1, "square": 2, "saw": 3}
 GEN_FS = 20000.0      # muestras por segundo del generador del firmware (D2 informa el real)
@@ -88,6 +90,7 @@ class Device(object):
         self.version = ""
         self.n = {"di": 0, "do": 0, "ai": 0, "ao": 0, "pwm": 0, "servo": 0, "neo": 0}
         self.vref = DEFAULT_VREF
+        self.adc_max = 2 ** DEFAULT_ADC_BITS - 1
         self.simulated = False
         self.cal = None
 
@@ -116,6 +119,7 @@ class Device(object):
         self.board, self.variant, self.version = board, variant, version
         self.n.update(counts)
         self.vref = VREF.get(board, DEFAULT_VREF)
+        self.adc_max = 2 ** ADC_BITS.get(board, DEFAULT_ADC_BITS) - 1
         if self.cal is not None and not self.simulated:
             self.vref = self.cal.vref(board, self.vref)
 
@@ -180,7 +184,7 @@ class Device(object):
             c = self.cal.counts_to_volts(self.board, ch, v)
             if c is not None:
                 return c
-        return v * self.vref / 4095.0
+        return v * self.vref / self.adc_max
 
     def ai_pair(self, ch):
         c = self.ai_raw(ch)
@@ -190,7 +194,7 @@ class Device(object):
         if self.cal is not None and not self.simulated:
             v = self.cal.counts_to_volts(self.board, ch, c)
         if v is None:
-            v = c * self.vref / 4095.0
+            v = c * self.vref / self.adc_max
         return c, v
 
     def ao_raw(self, ch, val):
