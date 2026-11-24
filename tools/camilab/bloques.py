@@ -499,6 +499,9 @@ binop("mul", "×", "Multiplicación", lambda a, b: a * b, "x × y")
 binop("div", "÷", "División", safe_div, "x ÷ y  (NaN si y = 0)")
 unop("abs", "|x|", "Valor absoluto", abs, "|x|")
 unop("sqrt", "√", "Raíz cuadrada", lambda a: math.sqrt(a) if a >= 0 else float("nan"), "√x")
+unop("sin", "sin", "Seno", math.sin, "sen(x), x en radianes")
+unop("cos", "cos", "Coseno", math.cos, "cos(x), x en radianes")
+unop("neg", "−x", "Negativo", lambda a: -a, "−x")
 unop("round", "≈", "Redondear", lambda a: float(round(a)), "Entero más cercano")
 spec("random", CAT_NUM, "Aleatorio", [], R, lambda c, n, i: {"r": random.random()},
      sym="⚄", doc="Número aleatorio entre 0 y 1.")
@@ -507,6 +510,9 @@ spec("scale", CAT_NUM, "Escalar (m·x + b)",
      lambda c, n, i: {"r": num(i["a"]) * num(i["m"]) + num(i["b"])}, sym="mx+b",
      doc="Convierte una lectura a unidades físicas: y = m·x + b. "
          "Ej. LM35: °C = 100 × V.")
+spec("clamp", CAT_NUM, "Limitar", [A, ("lo", "num", 0.0, "mín"), ("hi", "num", 1.0, "máx")], R,
+     lambda c, n, i: {"r": max(num(i["lo"]), min(num(i["hi"]), num(i["a"])))}, sym="⌊x⌋",
+     doc="Recorta x para que quede entre mín y máx.")
 spec("map", CAT_NUM, "Mapear rango",
      [A, ("in_lo", "num", 0.0, "entrada mín"), ("in_hi", "num", 4095.0, "entrada máx"),
       ("out_lo", "num", 0.0, "salida mín"), ("out_hi", "num", 100.0, "salida máx")], R,
@@ -578,6 +584,13 @@ spec("arr_mean", CAT_ARR, "Promedio", [AR], R, arr_stat(lambda a: sum(a) / len(a
      sym="x̄", doc="Promedio de los elementos.")
 spec("arr_max", CAT_ARR, "Máximo", [AR], R, arr_stat(max), sym="max", doc="Elemento mayor.")
 spec("arr_min", CAT_ARR, "Mínimo", [AR], R, arr_stat(min), sym="min", doc="Elemento menor.")
+spec("arr_build", CAT_ARR, "Construir arreglo",
+     [("a", "any", 0.0, "0"), ("b", "any", 0.0, "1"), ("c", "any", 0.0, "2"), ("d", "any", 0.0, "3")],
+     [("r", "arr", "arreglo")],
+     lambda c, n, i: {"r": [i[k] for k in "abcd"][:max(1, min(4, int(n["params"].get("n", 2))))]},
+     [("n", "num", 2, "Elementos (1 a 4)")], sym="[ ]",
+     doc="Junta valores en un arreglo; usa solo los primeros N. Con un Plot en el tiempo en "
+         "modo 'una curva por elemento' dibuja varias señales juntas.")
 spec("arr_append", CAT_ARR, "Agregar elemento", [AR, ("x", "any", 0.0, "elemento")],
      [("r", "arr", "arreglo")], lambda c, n, i: {"r": arr(i["arr"]) + [i["x"]]},
      sym="[+]", doc="Arreglo con el elemento agregado al final. Con un shift register "
@@ -676,6 +689,7 @@ IND_KINDS = [
     ("ind_bar", "Barra / termómetro", "num"),
     ("ind_chart", "Plot en el tiempo", "any"),
     ("ind_graph", "Gráfica de arreglo", "arr"),
+    ("ind_xy", "Gráfica XY", "arr"),
     ("ind_str", "Pantalla de texto", "any"),
     ("ind_arr_num", "Pantalla de arreglo numérico", "arr"),
     ("ind_arr_bool", "Pantalla de arreglo booleano", "arr"),
@@ -686,6 +700,16 @@ IND_DOC = "Terminal de un indicador del panel frontal: muestra el valor que le l
 for _k, _l, _o in CTL_KINDS:
     spec(_k, None, _l, [], _o, f_ctl, kind="ctl", doc=CTL_DOC)
 for _k, _l, _t in IND_KINDS:
-    spec(_k, None, _l, [("v", _t, 0.0, "valor")], [], f_ind, kind="ind", doc=IND_DOC)
+    if _k != "ind_xy":
+        spec(_k, None, _l, [("v", _t, 0.0, "valor")], [], f_ind, kind="ind", doc=IND_DOC)
+
+
+def f_xy(ctx, node, inp):
+    ctx.show(node["id"], [arr(inp["x"]), arr(inp["y"])])
+    return {}
+
+
+spec("ind_xy", None, "Gráfica XY", [("x", "arr", None, "X"), ("y", "arr", None, "Y")], [], f_xy,
+     kind="ind", doc="Dibuja Y contra X con dos arreglos del mismo tamaño. " + IND_DOC)
 
 PANEL_ONLY = [("image", "Imagen"), ("text", "Texto libre")]

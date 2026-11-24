@@ -17,7 +17,7 @@ from camilab.bloques import SPECS
 from camilab.config import APP, app_icon, EXT_VI, HERRAMIENTAS, lanzar, TH, THEME_NAMES
 from camilab.diagrama import Diagram, Palette
 from camilab.documento import new_doc, save_json
-from camilab.ejemplos import EXAMPLES
+from camilab.ejemplos import EXAMPLE_GROUPS
 from camilab.motor import EngineThread, RunCtx
 from camilab.panel import Panel, PanelPalette
 
@@ -42,9 +42,11 @@ def add_actions(menu, items):
 
 def add_examples(menu, app):
     sub = menu.addMenu(T("Ejemplos"))
-    for name, fn in EXAMPLES:
-        sub.addAction(T(name)).triggered.connect(
-            lambda _c=False, n=name, f=fn: app.open_example(n, f))
+    for group, items in EXAMPLE_GROUPS:
+        gm = sub.addMenu(T(group))
+        for name, fn in items:
+            gm.addAction(T(name)).triggered.connect(
+                lambda _c=False, n=name, f=fn: app.open_example(n, f))
 
 
 def add_theme(menu, app):

@@ -130,7 +130,7 @@ class Panel(QWidget):
                 QMessageBox.information(self, APP, T("Esa casilla ya está ocupada."))
                 return
             iid = self.host.new_terminal(tid)
-            self.place(iid, cell, big=tid in ("ind_chart", "ind_graph") or "_arr_" in tid)
+            self.place(iid, cell, big=tid in ("ind_chart", "ind_graph", "ind_xy") or "_arr_" in tid)
         self.rebuild()
         self.modified()
 

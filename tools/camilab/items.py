@@ -601,7 +601,7 @@ def panel_fields(dlg, f, n):
                 st.setText(T("con imagen"))
         bt.clicked.connect(choose)
     if t not in ("ctl_bool", "ctl_stop", "ind_led", "ind_img", "ctl_color", "ctl_ring", "ctl_str",
-                 "ind_str", "ind_graph", "ctl_port") and "_arr_" not in t:
+                 "ind_str", "ind_graph", "ind_xy", "ctl_port") and "_arr_" not in t:
         u = QLineEdit(p.get("units", ""))
         f.addRow(T("Unidades"), u)
         dlg.get["units"] = u.text
@@ -628,5 +628,9 @@ def panel_fields(dlg, f, n):
         dlg.get["value"] = c.isChecked
     if t == "ind_chart":
         dlg.num(f, "hist", T("Puntos visibles"), p.get("hist", 200), 0)
+        mc = QCheckBox()
+        mc.setChecked(bool(p.get("multi", False)))
+        f.addRow(T("Una curva por elemento del arreglo"), mc)
+        dlg.get["multi"] = mc.isChecked
     if t in ("ind_num", "ind_gauge", "ind_bar"):
         dlg.num(f, "dec", T("Decimales"), p.get("dec", 3), 0)

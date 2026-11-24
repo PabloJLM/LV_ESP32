@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
     QTableWidgetItem, QVBoxLayout, QWidget)
 
 from hub.lang import T
-from hub.ui import Led, Plot
+from hub.ui import C_CH, Led, Plot
 
 import base64
 from camilab.config import APP, fill_ports, port_value, PROJ, style_plot, TH
@@ -290,6 +290,8 @@ class PItem(QFrame):
         self.iid = iid
         self.setObjectName("pitem")
         self.hist = []
+        self.mhist = []
+        self.chart_n = 0
         lay = QVBoxLayout(self)
         lay.setContentsMargins(6, 4, 6, 6)
         lay.setSpacing(3)
@@ -428,7 +430,7 @@ class PItem(QFrame):
             self.w = Gauge(p)
         elif k == "ind_bar":
             self.w = Bar(p)
-        elif k in ("ind_chart", "ind_graph"):
+        elif k in ("ind_chart", "ind_graph", "ind_xy"):
             self.w = Plot()
             style_plot(self.w)
             self.w.setMinimumSize(120, 90)
@@ -505,6 +507,8 @@ class PItem(QFrame):
     def reset(self):
         k = self.kind
         self.hist = []
+        self.mhist = []
+        self.chart_n = 0
         if k == "ind_num":
             self.w.setText("---")
         elif k == "ind_led":
@@ -513,7 +517,7 @@ class PItem(QFrame):
             self.w.setVisible(False)
         elif k in ("ind_gauge", "ind_bar"):
             self.w.put(None)
-        elif k in ("ind_chart", "ind_graph"):
+        elif k in ("ind_chart", "ind_graph", "ind_xy"):
             self.w.overlay = []
             self.w.xr, self.w.yr = (0, 10), (0, 1)
             self.w.set_traces([])
@@ -543,12 +547,26 @@ class PItem(QFrame):
         elif k == "ind_str":
             self.w.setText(fmt(v) if not isinstance(v, str) else v)
         elif k == "ind_graph":
+            if isinstance(v, (list, tuple)) and v and all(isinstance(r, (list, tuple)) for r in v):
+                rows = [[float(x) for x in r if isinstance(x, (int, float))] for r in v]
+                self.draw_multi([(list(range(len(r))), r) for r in rows if r])
+                return
             ys = [float(x) for x in (v if isinstance(v, (list, tuple)) else [v])
                   if isinstance(x, (int, float))]
             self.draw(list(range(len(ys))), ys)
+        elif k == "ind_xy":
+            if isinstance(v, (list, tuple)) and len(v) == 2:
+                xs, ys = [list(a) if isinstance(a, (list, tuple)) else [a] for a in v]
+                pts = [(float(x), float(y)) for x, y in zip(xs, ys)
+                       if isinstance(x, (int, float)) and isinstance(y, (int, float))]
+                if pts:
+                    self.draw_multi([([a for a, _b in pts], [b for _a, b in pts])], xfit=True)
 
     def feed(self, vals):
         p = self.node["params"]
+        if p.get("multi"):
+            self.feed_multi(vals, int(p.get("hist", 200)) or 200)
+            return
         for v in vals:
             if isinstance(v, (list, tuple)):
                 self.hist.extend(float(x) for x in v if isinstance(x, (int, float)))
@@ -559,6 +577,47 @@ class PItem(QFrame):
         self.chart_n = getattr(self, "chart_n", 0) + len(vals)
         x0 = max(0, self.chart_n - len(self.hist))
         self.draw([x0 + i for i in range(len(self.hist))], self.hist, n)
+
+    def feed_multi(self, vals, n):
+        for v in vals:
+            row = [float(x) for x in (v if isinstance(v, (list, tuple)) else [v])
+                   if isinstance(x, (int, float))]
+            if row:
+                self.mhist.append(row)
+        self.mhist = self.mhist[-n:]
+        self.chart_n += len(vals)
+        if not self.mhist:
+            return
+        x0 = max(0, self.chart_n - len(self.mhist))
+        k = max(len(r) for r in self.mhist)
+        traces = []
+        for j in range(k):
+            pts = [(x0 + i, r[j]) for i, r in enumerate(self.mhist) if j < len(r)]
+            traces.append(([a for a, _b in pts], [b for _a, b in pts]))
+        self.draw_multi(traces, span=n)
+
+    def draw_multi(self, traces, span=None, xfit=False):
+        pl = self.w
+        traces = [(xs, ys) for xs, ys in traces if ys]
+        if not traces:
+            return
+        allx = [x for xs, _ys in traces for x in xs]
+        ally = [y for _xs, ys in traces for y in ys]
+        lo, hi, ny = nice_range(min(ally), max(ally), 5)
+        pl.yr = (lo, hi)
+        pl.ny = ny
+        if span:
+            pl.xr = (traces[0][0][0], traces[0][0][0] + span)
+            pl.nx = 5
+        elif xfit:
+            x0, x1, nx = nice_range(min(allx), max(allx), 5)
+            pl.xr, pl.nx = (x0, x1), nx
+        else:
+            x0, x1, nx = nice_range(0, max(1, max(len(xs) for xs, _ys in traces) - 1), 5)
+            pl.xr, pl.nx = (0, x1), nx
+        dec = self.node["params"].get("dec", 3)
+        pl.overlay = [(C_CH[j % len(C_CH)], fmt(ys[-1], dec)) for j, (_xs, ys) in enumerate(traces)]
+        pl.set_traces([(xs, ys, C_CH[j % len(C_CH)]) for j, (xs, ys) in enumerate(traces)])
 
     def draw(self, xs, ys, span=None):
         pl = self.w

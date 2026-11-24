@@ -520,3 +520,121 @@ _GEN = {
 }
 for _k, _v in _GEN.items():
     EN.setdefault(_k, _v)
+
+
+_NEW = {
+    "Básicos": "Basic",
+    "Avanzados": "Advanced",
+    "Gráficas y estructuras": "Graphs and structures",
+    "Leer una entrada digital": "Read a digital input",
+    "Entrada digital a salida digital": "Digital input to digital output",
+    "Leer analógico (cuentas y voltaje)": "Read analog (counts and voltage)",
+    "Escribir analógico (DAC)": "Write analog (DAC)",
+    "Entrada analógica a salida analógica": "Analog input to analog output",
+    "PWM (brillo de un LED)": "PWM (LED brightness)",
+    "Control de servo": "Servo control",
+    "NeoPixel: un píxel": "NeoPixel: single pixel",
+    "Texto en LCD I2C": "Text on I2C LCD",
+    "Analógico a PWM": "Analog to PWM",
+    "Generador de funciones (DAC)": "Function generator (DAC)",
+    "Información de la placa": "Board information",
+    "Osciloscopio de 2 canales": "2-channel oscilloscope",
+    "Curva DAC vs ADC (XY)": "DAC vs ADC curve (XY)",
+    "Leer analógico (cuentas)": "Read analog (counts)",
+    "Canal DI": "DI channel",
+    "Entrada": "Input",
+    "Entrada DI0": "Input DI0",
+    "Salida DO0": "Output DO0",
+    "Cuentas": "Counts",
+    "Nivel": "Level",
+    "Voltaje de salida": "Output voltage",
+    "Salida AO0": "Output AO0",
+    "Señal reproducida": "Replayed signal",
+    "Canal PWM": "PWM channel",
+    "Ciclo de trabajo": "Duty cycle",
+    "Canal servo": "Servo channel",
+    "Ángulo": "Angle",
+    "Posición": "Position",
+    "Píxel": "Pixel",
+    "Texto": "Text",
+    "Fila": "Row",
+    "Fila 1": "Row 1",
+    "Fila 2": "Row 2",
+    "Columna": "Column",
+    "Duty (%)": "Duty (%)",
+    "Forma": "Shape",
+    "Senoidal": "Sine",
+    "Triangular": "Triangle",
+    "Cuadrada": "Square",
+    "Diente de sierra": "Sawtooth",
+    "Frecuencia": "Frequency",
+    "Amplitud": "Amplitude",
+    "Duty (cuadrada)": "Duty (square)",
+    "Frecuencia real": "Actual frequency",
+    "Señal en AI0": "Signal on AI0",
+    "Placa": "Board",
+    "Variante": "Variant",
+    "Versión": "Version",
+    "Canales (DI DO AI AO PWM SERVO NEO)": "Channels (DI DO AI AO PWM SERVO NEO)",
+    "Responde": "Responds",
+    "Latencia": "Latency",
+    "Canal A": "Channel A",
+    "Canal B": "Channel B",
+    "Canales A y B": "Channels A and B",
+    "Puntos": "Points",
+    "Periodos": "Periods",
+    "Seno y coseno": "Sine and cosine",
+    "Relación de frecuencias": "Frequency ratio",
+    "Y contra X": "Y vs X",
+    "Voltaje leído vs voltaje escrito": "Voltage read vs voltage written",
+    "Conecta un botón o interruptor a la entrada digital elegida":
+        "Connect a button or switch to the chosen digital input",
+    "Lo que entra por DI0 se refleja en DO0": "What comes in on DI0 is mirrored on DO0",
+    "Cuentas de 0 a 4095 en 12 bits (0 a 1023 en 10 bits)":
+        "Counts from 0 to 4095 at 12 bits (0 to 1023 at 10 bits)",
+    "Solo ESP32 Wrover y Nucleo F303K8 tienen DAC. Salida en AO0":
+        "Only ESP32 Wrover and Nucleo F303K8 have a DAC. Output on AO0",
+    "Lo que se lee en la entrada analógica sale por AO0":
+        "What is read on the analog input comes out on AO0",
+    "PWM de 1 kHz. Conecta un LED con resistencia de 330 Ω":
+        "1 kHz PWM. Connect an LED with a 330 Ω resistor",
+    "Alimenta el servo con una fuente externa y une las tierras":
+        "Power the servo from an external supply and join the grounds",
+    "Cambia el número de píxel y el color para pintar cada LED de la tira":
+        "Change the pixel number and color to paint each LED on the strip",
+    "LCD de 16x2 en I2C (dirección 0x27 por defecto; se cambia en el bloque)":
+        "16x2 I2C LCD (address 0x27 by default; change it in the block)",
+    "0 V a 3.3 V en la entrada es 0 % a 100 % en PWM0": "0 V to 3.3 V in is 0 % to 100 % on PWM0",
+    "Une AO0 con AI0. Ajusta la onda antes de presionar Run; al parar, el DAC vuelve a 0 V":
+        "Join AO0 to AI0. Set the wave before pressing Run; when stopped, the DAC returns to 0 V",
+    "Se ejecuta una vez: presiona Run para consultar la placa":
+        "Runs once: press Run to query the board",
+    "Cada canal se dibuja con su color. Prueba AI2 (senoidal) y AI5 (cuadrada) en el simulador":
+        "Each channel is drawn in its own color. Try AI2 (sine) and AI5 (square) in the simulator",
+    "No necesita placa: el For calcula los puntos y la gráfica dibuja las dos curvas":
+        "No board needed: the For loop computes the points and the graph draws both curves",
+    "x = sen(t), y = sen(r·t). Cambia la relación para ver otras figuras":
+        "x = sin(t), y = sin(r·t). Change the ratio to see other figures",
+    "Conecta AO0 con AI0: debe salir una recta de 45°": "Connect AO0 to AI0: you should get a 45° line",
+    "Gráfica XY": "XY graph",
+    "Una curva por elemento del arreglo": "One trace per array element",
+    "Seno": "Sine",
+    "Coseno": "Cosine",
+    "Negativo": "Negative",
+    "Limitar": "Clamp",
+    "Construir arreglo": "Build array",
+    "Elementos (1 a 4)": "Elements (1 to 4)",
+    "sen(x), x en radianes": "sin(x), x in radians",
+    "cos(x), x en radianes": "cos(x), x in radians",
+    "Recorta x para que quede entre mín y máx.": "Clamps x so it stays between min and max.",
+    "Junta valores en un arreglo; usa solo los primeros N. Con un Plot en el tiempo en modo "
+    "'una curva por elemento' dibuja varias señales juntas.":
+        "Gathers values into an array; only the first N are used. With a Time plot in 'one trace "
+        "per array element' mode it draws several signals together.",
+}
+_XY = "Dibuja Y contra X con dos arreglos del mismo tamaño. "
+_NEW[_XY + "Terminal de un indicador del panel frontal: muestra el valor que le llega."] = (
+    "Plots Y against X with two arrays of the same size. "
+    "Terminal of a front-panel indicator: shows the value it receives.")
+for _k, _v in _NEW.items():
+    EN.setdefault(_k, _v)
