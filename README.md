@@ -1,12 +1,17 @@
-# LV_ESP32
+# NOMBRE PENDIENTEEEEEEEEEEE
 
-Framework educativo de código abierto para controlar placas **ESP32**, **Arduino** y **Nucleo** desde **LabVIEW** por USB, sin que el estudiante programe la placa. Un VI lee y escribe entradas y salidas digitales y analógicas, PWM, servos, NeoPixels y LCD I2C.
+Framework educativo de código abierto para controlar placas **ESP32**, **Arduino** y **Nucleo** por USB, sin que el estudiante programe la placa. Tiene dos modos de uso:
+
+- **Con LabVIEW:** un VI lee y escribe entradas y salidas digitales y analógicas, PWM, servos, NeoPixels y LCD I2C.
+- **Sin LabVIEW:** dos herramientas de escritorio en Python, el **Hub** (instrumentos virtuales) y **CamiLab** (editor visual de bloques con simulador).
 
 ```
 LabVIEW  --  VISA serie (USB, 115200)  --  placa con el firmware de LV_ESP32
 ```
 
 LabVIEW manda un número de canal y el firmware lo traduce al pin de cada placa, así que el mismo VI sirve en cualquiera.
+
+El protocolo es serie y está documentado en `docs/Protocolo.md`, así que cualquier programa que abra un puerto serie también puede usar la placa.
 
 ## Qué trae
 
